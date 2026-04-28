@@ -122,27 +122,27 @@ export function ChatWindow({
   };
 
   return (
-    <section className="flex h-full min-h-[560px] overflow-hidden rounded-2xl border bg-card shadow-xl shadow-black/10 sm:min-h-[680px]">
+    <section className="flex h-full min-h-[560px] overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0e] text-[#f6f1e8] shadow-2xl shadow-black/25 sm:min-h-[680px]">
       <div className="flex min-h-0 flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0b0b0e]/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+          <span className="grid size-10 place-items-center rounded-2xl bg-[#b11226]/15 text-[#f6f1e8]">
             <Hash className="size-5" />
           </span>
           <div className="min-w-0">
             <p className="truncate font-semibold">{activeChannel.name}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#d6d0c6]/55">
               {isRealtime ? "Realtime connected" : "Local mode until Supabase is configured"}
             </p>
           </div>
         </div>
-        <div className="rounded-full border bg-background/70 px-3 py-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-[#d6d0c6]/65">
           <Radio className="size-3.5" />
           {presence.onlineUsers.length} online
           {presence.isTyping && <span>• typing...</span>}
         </div>
       </header>
-      <div className="flex-1 overflow-hidden p-3 sm:p-4">
+      <div className="flex-1 overflow-hidden bg-[radial-gradient(circle_at_20%_0%,rgba(177,18,38,0.08),transparent_30%)] p-3 sm:p-4">
         <MessageList
           messages={messages}
           currentUserId={currentUser.id}
@@ -150,7 +150,7 @@ export function ChatWindow({
           onDelete={deleteMessage}
         />
       </div>
-      <div className="border-t p-3 sm:p-4">
+      <div className="border-t border-white/10 bg-[#08080a]/90 p-3 sm:p-4">
         <MessageInput
           channelName={activeChannel.name}
           onSend={sendMessage}

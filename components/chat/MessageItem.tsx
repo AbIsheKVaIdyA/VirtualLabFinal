@@ -41,21 +41,21 @@ export function MessageItem({
   };
 
   return (
-    <div className="group flex gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-muted/40">
+    <div className="group flex gap-3 rounded-2xl px-3 py-2 transition-colors hover:bg-white/[0.04]">
       <Avatar className="mt-1 size-9">
-        <AvatarFallback>{initials}</AvatarFallback>
+        <AvatarFallback className="bg-[#b11226]/20 text-[#f6f1e8]">{initials}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="font-semibold">{authorName}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="font-semibold text-[#f6f1e8]">{authorName}</p>
+          <p className="text-xs text-[#d6d0c6]/45">
             {new Date(message.createdAt).toLocaleString()}
           </p>
           {message.editedAt && (
-            <span className="text-xs text-muted-foreground">(edited)</span>
+            <span className="text-xs text-[#d6d0c6]/45">(edited)</span>
           )}
           {message.optimistic && (
-            <span className="text-xs text-muted-foreground">sending...</span>
+            <span className="text-xs text-[#d6d0c6]/45">sending...</span>
           )}
         </div>
         {editing ? (
@@ -63,7 +63,7 @@ export function MessageItem({
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              className="min-h-20 w-full resize-none rounded-xl border bg-background px-3 py-2 text-sm outline-none ring-0 transition focus:border-primary"
+              className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-[#f6f1e8] outline-none ring-0 transition focus:border-[#b11226]"
               autoFocus
             />
             <div className="flex flex-wrap items-center gap-2">
@@ -87,7 +87,7 @@ export function MessageItem({
             </div>
           </form>
         ) : (
-          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+          <p className="mt-1 rounded-2xl border border-white/10 bg-white/[0.035] px-3 py-2 whitespace-pre-wrap break-words text-sm text-[#d6d0c6]/80">
             {message.content}
           </p>
         )}

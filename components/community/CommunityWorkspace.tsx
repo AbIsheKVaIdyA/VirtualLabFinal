@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Radio, ShieldCheck, Users2 } from "lucide-react";
+import { Mic2, Radio, ShieldCheck, Sparkles, Users2 } from "lucide-react";
 
 import { ChannelSidebar } from "@/components/chat/ChannelSidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
@@ -66,16 +66,20 @@ export function CommunityWorkspace({
   const voiceChannels = seed.channels.filter((channel) => channel.type === "voice");
 
   return (
-    <section className={cn("flex min-h-[calc(100vh-7rem)] flex-col gap-3", className)}>
-      <header className="rounded-2xl border border-white/10 bg-[#08080a]/95 px-4 py-3 text-[#f6f1e8] shadow-2xl shadow-black/35 sm:rounded-3xl sm:px-5 sm:py-4">
+    <section className={cn("flex min-h-[calc(100vh-7rem)] flex-col gap-3 overflow-hidden", className)}>
+      <header className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_0%_0%,rgba(177,18,38,0.28),transparent_34%),linear-gradient(135deg,#121217_0%,#08080a_55%,#030304_100%)] px-4 py-4 text-[#f6f1e8] shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-[#d6d0c6]/45">
-              Community
+            <p className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-[#d6d0c6]/45">
+              <Sparkles className="size-3.5 text-[#b11226]" />
+              Learning Community
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               {activeServer?.name ?? "Virtual Lab"}
             </h1>
+            <p className="mt-1 max-w-2xl text-xs text-[#d6d0c6]/55 sm:text-sm">
+              Course channels, voice rooms, and live study conversations in one workspace.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <Badge variant={isSupabaseConfigured ? "default" : "secondary"}>
@@ -91,13 +95,13 @@ export function CommunityWorkspace({
             )}
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 sm:mt-4">
+        <div className="mt-4 grid grid-cols-3 gap-2">
           {[
             { label: "Channels", value: seed.channels.length, icon: Radio },
             { label: "Online", value: onlineUsers.length, icon: Users2 },
             { label: "Moderation", value: "On", icon: ShieldCheck },
           ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 sm:rounded-2xl sm:px-4 sm:py-3">
+            <div key={label} className="rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 backdrop-blur sm:rounded-2xl sm:px-4 sm:py-3">
               <p className="flex items-center gap-1.5 text-[0.68rem] text-[#d6d0c6]/55 sm:gap-2 sm:text-xs">
                 <Icon className="size-3.5 text-blue-300" />
                 {label}
@@ -108,8 +112,8 @@ export function CommunityWorkspace({
         </div>
       </header>
 
-      <div className="grid flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="grid min-h-[680px] overflow-hidden rounded-2xl border border-white/10 bg-[#070709] shadow-2xl shadow-black/30 sm:min-h-[780px] sm:rounded-3xl lg:grid-cols-[80px_270px_1fr]">
+      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-[680px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#08080a_0%,#050506_100%)] shadow-2xl shadow-black/35 sm:min-h-[calc(100vh-18rem)] sm:rounded-3xl lg:grid-cols-[82px_290px_minmax(0,1fr)]">
           <ServerSidebar
             servers={seed.servers}
             activeServerId={activeServerId}
@@ -125,7 +129,7 @@ export function CommunityWorkspace({
             activeChannelId={activeChannel.id}
             onSelect={setActiveChannelId}
           />
-          <main className="min-h-0 p-3 sm:p-4">
+          <main className="min-h-0 bg-[#050506] p-3 sm:p-4">
             <ChatWindow
               tenantId={seed.tenant.id}
               activeChannel={activeChannel}
@@ -136,13 +140,18 @@ export function CommunityWorkspace({
         </div>
 
         <aside className="grid gap-3 md:grid-cols-2 xl:grid-cols-1 xl:grid-rows-[1fr_auto]">
-          <div className="rounded-2xl border border-white/10 bg-[#0b0b0e] p-4 text-[#f6f1e8] sm:rounded-3xl sm:p-5">
-            <p className="text-sm font-semibold">Online Now</p>
+          <div className="rounded-2xl border border-white/10 bg-[#0b0b0e] p-4 text-[#f6f1e8] shadow-xl shadow-black/20 sm:rounded-3xl sm:p-5">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold">Online Now</p>
+              <Badge className="bg-green-500/15 text-green-100 hover:bg-green-500/15">
+                Live
+              </Badge>
+            </div>
             <div className="mt-4 flex gap-3 overflow-x-auto pb-1 md:block md:space-y-3 md:overflow-visible md:pb-0">
               {onlineUsers.map((user) => (
                 <div
                   key={user.id}
-                  className="flex min-w-52 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 md:min-w-0"
+                  className="flex min-w-52 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3 transition-colors hover:bg-white/[0.07] md:min-w-0"
                 >
                   <span className="grid size-9 place-items-center rounded-full bg-[#b11226]/25 text-sm font-semibold">
                     {user.name.slice(0, 1)}
@@ -156,19 +165,26 @@ export function CommunityWorkspace({
               ))}
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-[#0b0b0e] p-4 text-[#f6f1e8] sm:rounded-3xl sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-[#0b0b0e] p-4 text-[#f6f1e8] shadow-xl shadow-black/20 sm:rounded-3xl sm:p-5">
             <p className="text-sm font-semibold">Voice Rooms</p>
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 md:block md:space-y-2 md:overflow-visible md:pb-0">
               {voiceChannels.map((channel) => (
                 <button
                   key={channel.id}
                   type="button"
-                  className="flex min-w-48 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.06] md:w-full md:min-w-0"
+                  onClick={() => setActiveChannelId(channel.id)}
+                  className="flex min-w-48 items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm transition-colors hover:bg-white/[0.08] md:w-full md:min-w-0"
                 >
-                  <span>{channel.name}</span>
-                  <Radio className="size-4 text-blue-300" />
+                  <span className="flex items-center gap-2">
+                    <Mic2 className="size-4 text-blue-300" />
+                    {channel.name}
+                  </span>
+                  <Radio className="size-4 text-[#b11226]" />
                 </button>
               ))}
+            </div>
+            <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs text-[#d6d0c6]/60">
+              Select a voice room to join with your microphone.
             </div>
           </div>
         </aside>

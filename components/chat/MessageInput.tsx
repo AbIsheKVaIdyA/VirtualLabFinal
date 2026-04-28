@@ -26,7 +26,7 @@ export function MessageInput({
   };
 
   return (
-    <form onSubmit={submit} className="flex gap-2 rounded-2xl border bg-card p-2">
+    <form onSubmit={submit} className="flex gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 shadow-inner">
       <Input
         value={content}
         onChange={(event) => {
@@ -34,9 +34,9 @@ export function MessageInput({
           onTyping?.();
         }}
         placeholder={`Message #${channelName}`}
-        className="min-w-0 border-0 bg-transparent text-sm focus-visible:ring-0"
+        className="min-w-0 border-0 bg-transparent text-sm text-[#f6f1e8] placeholder:text-[#d6d0c6]/40 focus-visible:ring-0"
       />
-      <Button type="submit" size="icon" aria-label="Send message">
+      <Button type="submit" size="icon" aria-label="Send message" className="bg-[#b11226] text-white hover:bg-[#8f0e1f]">
         <SendHorizonal className="size-4" />
       </Button>
     </form>

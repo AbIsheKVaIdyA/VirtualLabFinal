@@ -17,10 +17,10 @@ export function ChannelSidebar({
   onSelect: (channelId: string) => void;
 }) {
   return (
-    <aside className="border-b bg-card/70 p-3 lg:w-64 lg:border-b-0 lg:border-r lg:p-4">
+    <aside className="border-b border-white/10 bg-[#0b0b0e] p-3 text-[#f6f1e8] lg:w-72 lg:border-b-0 lg:border-r lg:p-4">
       <div className="mb-3 lg:mb-5">
-        <p className="text-sm font-semibold">{server?.name ?? "Server"}</p>
-        <p className="hidden text-xs text-muted-foreground sm:block">Learning workspace</p>
+        <p className="text-base font-semibold">{server?.name ?? "Server"}</p>
+        <p className="hidden text-xs text-[#d6d0c6]/55 sm:block">Learning workspace</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:block lg:space-y-5">
@@ -54,7 +54,7 @@ function ChannelGroup({
 }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#d6d0c6]/45">
         {title}
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
@@ -66,14 +66,14 @@ function ChannelGroup({
               type="button"
               onClick={() => onSelect(channel.id)}
               className={cn(
-                "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors lg:w-full",
+                "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors lg:w-full",
                 activeChannelId === channel.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-[#b11226] text-white shadow-lg shadow-[#b11226]/15"
+                  : "text-[#d6d0c6]/65 hover:bg-white/[0.06] hover:text-[#f6f1e8]"
               )}
             >
-              <Icon className="size-4" />
-              {channel.name}
+              <Icon className="size-4 shrink-0" />
+              <span className="truncate">{channel.name}</span>
             </button>
           );
         })}
