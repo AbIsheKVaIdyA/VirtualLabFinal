@@ -55,9 +55,11 @@ export function ChatWindow({
     if (!isSupabaseConfigured || !supabase) return;
 
     const { error } = await supabase.from("messages").insert({
+      id: optimistic.id,
       tenant_id: tenantId,
       channel_id: activeChannel.id,
       user_id: currentUser.id,
+      author_name: currentUser.name,
       content,
     });
 
@@ -67,7 +69,14 @@ export function ChatWindow({
           message.id === optimistic.id ? { ...message, optimistic: false } : message
         )
       );
+      return;
     }
+
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === optimistic.id ? { ...message, optimistic: false } : message
+      )
+    );
   };
 
   return (

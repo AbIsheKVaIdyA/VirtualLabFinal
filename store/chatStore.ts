@@ -8,7 +8,7 @@ import type {
 } from "@/lib/communication-types";
 
 const tenant: Tenant = {
-  id: "tenant-local",
+  id: "11111111-1111-4111-8111-111111111111",
   name: "Virtual Lab School",
   plan: "free",
   createdAt: new Date().toISOString(),
@@ -25,7 +25,7 @@ const user: CommunicationUser = {
 
 const servers: Server[] = [
   {
-    id: "server-campus",
+    id: "22222222-2222-4222-8222-222222222222",
     tenantId: tenant.id,
     name: "Campus",
     icon: "VL",
@@ -34,28 +34,28 @@ const servers: Server[] = [
 
 const channels: Channel[] = [
   {
-    id: "channel-general",
+    id: "33333333-3333-4333-8333-333333333333",
     tenantId: tenant.id,
     serverId: servers[0].id,
     type: "text",
     name: "general",
   },
   {
-    id: "channel-java",
+    id: "44444444-4444-4444-8444-444444444444",
     tenantId: tenant.id,
     serverId: servers[0].id,
     type: "text",
     name: "java-course",
   },
   {
-    id: "channel-python",
+    id: "55555555-5555-4555-8555-555555555555",
     tenantId: tenant.id,
     serverId: servers[0].id,
     type: "text",
     name: "python-course",
   },
   {
-    id: "channel-study-room",
+    id: "66666666-6666-4666-8666-666666666666",
     tenantId: tenant.id,
     serverId: servers[0].id,
     type: "voice",
@@ -79,7 +79,7 @@ export function createOptimisticMessage(input: {
   content: string;
 }): Message {
   return {
-    id: `optimistic-${crypto.randomUUID()}`,
+    id: crypto.randomUUID(),
     tenantId: input.tenantId,
     channelId: input.channelId,
     userId: input.userId,

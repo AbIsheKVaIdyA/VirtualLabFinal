@@ -6,6 +6,8 @@ import type { Message } from "@/lib/communication-types";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase-client";
 
 function mapMessage(row: Record<string, unknown>): Message {
+  const authorName = row.author_name ? String(row.author_name) : "Student";
+
   return {
     id: String(row.id),
     tenantId: String(row.tenant_id),
@@ -15,6 +17,11 @@ function mapMessage(row: Record<string, unknown>): Message {
     createdAt: String(row.created_at),
     editedAt: row.edited_at ? String(row.edited_at) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null,
+    user: {
+      id: String(row.user_id),
+      name: authorName,
+      role: "user",
+    },
   };
 }
 
@@ -60,7 +67,14 @@ export function useRealtimeMessages(input: {
           filter: `channel_id=eq.${input.channelId}`,
         },
         (payload) => {
-          setMessages((current) => [...current, mapMessage(payload.new)]);
+          const nextMessage = mapMessage(payload.new);
+          setMessages((current) =>
+            current.some((message) => message.id === nextMessage.id)
+              ? current.map((message) =>
+                  message.id === nextMessage.id ? nextMessage : message
+                )
+              : [...current, nextMessage]
+          );
         }
       )
       .subscribe((status) => {

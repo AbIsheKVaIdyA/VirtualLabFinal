@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const scopes = [
   "user-read-email",
@@ -8,11 +8,10 @@ const scopes = [
   "streaming",
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const redirectUri =
-    process.env.SPOTIFY_REDIRECT_URI ?? `${appUrl}/api/auth/spotify/callback`;
+  const appUrl = request.nextUrl.origin;
+  const redirectUri = `${appUrl}/api/auth/spotify/callback`;
 
   if (!clientId) {
     return NextResponse.redirect(new URL("/dashboard?spotify=missing_env", appUrl));
