@@ -26,9 +26,32 @@ type SpotifyShow = {
   }>;
 };
 
+type SpotifyEpisode = {
+  id: string;
+  name: string;
+  description: string;
+  duration_ms?: number;
+  external_urls?: {
+    spotify?: string;
+  };
+  images?: Array<{
+    url: string;
+  }>;
+  show?: {
+    name?: string;
+    publisher?: string;
+    images?: Array<{
+      url: string;
+    }>;
+  };
+};
+
 type SpotifySearchResponse = {
   shows?: {
     items?: Array<SpotifyShow | null>;
+  };
+  episodes?: {
+    items?: Array<SpotifyEpisode | null>;
   };
 };
 
@@ -131,9 +154,9 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = new URLSearchParams({
       q: EDUCATIONAL_QUERIES[category],
-      type: "show",
+      type: "episode,show",
       market: "US",
-      limit: "12",
+      limit: "8",
     });
 
     const searchRes = await fetch(
@@ -157,11 +180,30 @@ export async function GET(request: NextRequest) {
     }
 
     const searchData = (await searchRes.json()) as SpotifySearchResponse;
-    const podcasts =
+    const episodes =
+      searchData.episodes?.items
+        ?.filter((episode): episode is SpotifyEpisode => Boolean(episode))
+        .map((episode) => ({
+          id: `episode-${episode.id}`,
+          title: episode.name,
+          publisher: episode.show?.name ?? episode.show?.publisher ?? "Spotify episode",
+          description: episode.description,
+          episodeCount: episode.duration_ms
+            ? Math.max(1, Math.round(episode.duration_ms / 60000))
+            : 1,
+          imageUrl: episode.images?.[0]?.url ?? episode.show?.images?.[0]?.url ?? null,
+          spotifyUrl:
+            episode.external_urls?.spotify ?? `https://open.spotify.com/episode/${episode.id}`,
+          embedUrl: `https://open.spotify.com/embed/episode/${episode.id}?utm_source=generator&theme=0`,
+          category: `${category} episode`,
+          kind: "episode",
+        })) ?? [];
+
+    const shows =
       searchData.shows?.items
         ?.filter((show): show is SpotifyShow => Boolean(show))
         .map((show) => ({
-          id: show.id,
+          id: `show-${show.id}`,
           title: show.name,
           publisher: show.publisher,
           description: show.description,
@@ -169,16 +211,18 @@ export async function GET(request: NextRequest) {
           imageUrl: show.images?.[0]?.url ?? null,
           spotifyUrl: show.external_urls?.spotify ?? `https://open.spotify.com/show/${show.id}`,
           embedUrl: `https://open.spotify.com/embed/show/${show.id}?utm_source=generator&theme=0`,
-          category,
+          category: `${category} show`,
+          kind: "show",
         })) ?? [];
+    const podcasts = [...episodes, ...shows];
 
     return withRefreshedCookie({
       connected: true,
       source: "spotify",
       category,
       message: podcasts.length
-        ? "Recommendations loaded from your connected Spotify account."
-        : "No Spotify results matched this category yet. Try a different filter.",
+        ? "Playable Spotify episodes and shows loaded for your study topic."
+        : "No playable Spotify results matched this category yet. Try a different filter.",
       podcasts,
     });
   } catch {

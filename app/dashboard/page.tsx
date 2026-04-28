@@ -51,6 +51,7 @@ type SpotifyPodcast = {
   spotifyUrl: string;
   embedUrl: string | null;
   category: string;
+  kind?: "episode" | "show";
 };
 
 type SpotifyConnection = {
@@ -312,12 +313,11 @@ function DashboardContent() {
                       </Badge>
                       <div>
                         <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
-                          Premium podcasts for serious learning.
+                          Play study audio inside Virtual Lab.
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
-                          A behavior-aware audio layer that recommends focus
-                          playlists, podcasts, and calmer modes based on study
-                          activity.
+                          Pick a topic and start a Spotify episode or show from
+                          the embedded player without leaving your study flow.
                         </p>
                       </div>
                       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
@@ -415,13 +415,11 @@ function DashboardContent() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
                         <Disc3 className="size-5 text-[#b11226]" />
-                        Listen in Virtual Lab
+                        Now Playing
                       </CardTitle>
                       <p className="text-sm text-[#d6d0c6]/60">
-                        Select a show from the recommendations, then use the
-                        embedded player. Connecting Spotify links your profile;
-                        direct device playback still requires Spotify Premium and
-                        an active Spotify device.
+                        Use the embedded Spotify player below. Select any card
+                        on the right to switch what plays here.
                       </p>
                     </CardHeader>
                     <CardContent>
@@ -436,25 +434,16 @@ function DashboardContent() {
                           className="min-h-[220px] rounded-2xl border-0"
                         />
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-sm text-[#d6d0c6]/70">
-                          <p className="font-semibold text-[#f6f1e8]">Player waiting for Spotify data.</p>
-                          <p className="mt-2">
-                            Add valid Spotify API keys and this panel will use
-                            Spotify&apos;s official embed player for the selected show.
-                          </p>
-                          {selectedSpotifyPodcast && (
-                            <a
-                              href={selectedSpotifyPodcast.spotifyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={cn(
-                                buttonVariants({ variant: "secondary" }),
-                                "mt-4 bg-[#b11226] text-white hover:bg-[#8f0e1f]"
-                              )}
-                            >
-                              Open on Spotify
-                            </a>
-                          )}
+                        <div className="grid min-h-[260px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
+                          <div>
+                            <p className="font-semibold text-[#f6f1e8]">
+                              Loading playable Spotify audio...
+                            </p>
+                            <p className="mt-2">
+                              Choose a topic or wait for Spotify recommendations
+                              to finish loading.
+                            </p>
+                          </div>
                         </div>
                       )}
                     </CardContent>
@@ -465,7 +454,7 @@ function DashboardContent() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
                           <Podcast className="size-5 text-blue-300" />
-                          Best Educational Shows
+                          Playable Recommendations
                         </CardTitle>
                         <Badge className="border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
                           {spotifyCategory}
@@ -490,11 +479,11 @@ function DashboardContent() {
                       ) : spotifyPodcasts.length === 0 ? (
                         <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
                           <p className="font-semibold text-[#f6f1e8]">
-                            No Spotify recommendations loaded yet.
+                            No playable Spotify recommendations loaded yet.
                           </p>
                           <p className="mt-2">
-                            Try another topic filter, or reconnect Spotify if
-                            this keeps happening.
+                            Try another topic filter. If this keeps happening,
+                            reconnect Spotify.
                           </p>
                         </div>
                       ) : (
@@ -544,10 +533,12 @@ function DashboardContent() {
                                   </p>
                                   <div className="flex flex-wrap gap-2 pt-1">
                                     <Badge className="bg-white/10 text-[#f6f1e8] hover:bg-white/10">
-                                      {podcast.category}
+                                      {podcast.kind ?? "audio"}
                                     </Badge>
                                     <Badge className="bg-blue-500/15 text-blue-200 hover:bg-blue-500/15">
-                                      {podcast.episodeCount} episodes
+                                      {podcast.kind === "episode"
+                                        ? `${podcast.episodeCount} min`
+                                        : `${podcast.episodeCount} episodes`}
                                     </Badge>
                                   </div>
                                 </div>

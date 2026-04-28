@@ -59,8 +59,9 @@ export function CommunityWorkspace({
     ],
     [currentUser.id, currentUser.name, seed.users]
   );
-  const initialMessages = seed.messages.filter(
-    (message) => message.channelId === activeChannel.id
+  const initialMessages = useMemo(
+    () => seed.messages.filter((message) => message.channelId === activeChannel.id),
+    [activeChannel.id, seed.messages]
   );
   const voiceChannels = seed.channels.filter((channel) => channel.type === "voice");
 

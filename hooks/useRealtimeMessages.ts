@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Message } from "@/lib/communication-types";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase-client";
@@ -32,10 +32,18 @@ export function useRealtimeMessages(input: {
 }) {
   const [messages, setMessages] = useState<Message[]>(input.initialMessages ?? []);
   const [isRealtime, setIsRealtime] = useState(false);
+  const initialMessagesRef = useRef(input.initialMessages ?? []);
 
   useEffect(() => {
-    queueMicrotask(() => setMessages(input.initialMessages ?? []));
-  }, [input.channelId, input.initialMessages]);
+    initialMessagesRef.current = input.initialMessages ?? [];
+  }, [input.initialMessages]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setMessages(initialMessagesRef.current);
+      setIsRealtime(false);
+    });
+  }, [input.channelId]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
