@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { Message } from "@/lib/communication-types";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase-client";
+import { useChatMessageStore } from "@/store/chatStore";
 
 function mapMessage(row: Record<string, unknown>): Message {
   const authorName = row.author_name ? String(row.author_name) : "Student";
@@ -30,20 +31,18 @@ export function useRealtimeMessages(input: {
   channelId: string;
   initialMessages?: Message[];
 }) {
-  const [messages, setMessages] = useState<Message[]>(input.initialMessages ?? []);
   const [isRealtime, setIsRealtime] = useState(false);
-  const initialMessagesRef = useRef(input.initialMessages ?? []);
+  const messages = useChatMessageStore(
+    (state) => state.messagesByChannel[input.channelId] ?? input.initialMessages ?? []
+  );
+  const initializeChannel = useChatMessageStore((state) => state.initializeChannel);
+  const setChannelMessages = useChatMessageStore((state) => state.setChannelMessages);
+  const upsertMessage = useChatMessageStore((state) => state.upsertMessage);
 
   useEffect(() => {
-    initialMessagesRef.current = input.initialMessages ?? [];
-  }, [input.initialMessages]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setMessages(initialMessagesRef.current);
-      setIsRealtime(false);
-    });
-  }, [input.channelId]);
+    initializeChannel(input.channelId, input.initialMessages ?? []);
+    queueMicrotask(() => setIsRealtime(false));
+  }, [initializeChannel, input.channelId, input.initialMessages]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -61,7 +60,7 @@ export function useRealtimeMessages(input: {
       .limit(50)
       .then(({ data }) => {
         if (!mounted || !data) return;
-        setMessages(data.map((row) => mapMessage(row)));
+        setChannelMessages(input.channelId, data.map((row) => mapMessage(row)));
       });
 
     const channel = client
@@ -75,14 +74,7 @@ export function useRealtimeMessages(input: {
           filter: `channel_id=eq.${input.channelId}`,
         },
         (payload) => {
-          const nextMessage = mapMessage(payload.new);
-          setMessages((current) =>
-            current.some((message) => message.id === nextMessage.id)
-              ? current.map((message) =>
-                  message.id === nextMessage.id ? nextMessage : message
-                )
-              : [...current, nextMessage]
-          );
+          upsertMessage(input.channelId, mapMessage(payload.new));
         }
       )
       .subscribe((status) => {
@@ -93,7 +85,7 @@ export function useRealtimeMessages(input: {
       mounted = false;
       void client.removeChannel(channel);
     };
-  }, [input.channelId, input.tenantId]);
+  }, [input.channelId, input.tenantId, setChannelMessages, upsertMessage]);
 
   const sortedMessages = useMemo(
     () =>
@@ -105,7 +97,6 @@ export function useRealtimeMessages(input: {
 
   return {
     messages: sortedMessages,
-    setMessages,
     isRealtime,
     isSupabaseConfigured,
   };

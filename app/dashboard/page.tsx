@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpenText,
   Disc3,
@@ -11,17 +11,11 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AudioRecommendationPanel } from "@/components/audio/AudioRecommendationPanel";
-import { FocusMode } from "@/components/audio/FocusMode";
-import { NowPlayingBar } from "@/components/audio/NowPlayingBar";
 import { AuthNavControls } from "@/components/auth-nav-controls";
 import { CommunityWorkspace } from "@/components/community/CommunityWorkspace";
-import { StudyInsightsPanel } from "@/components/dashboard/StudyInsightsPanel";
 import { cn } from "@/lib/utils";
-import { runAudioAutomationEngine } from "@/services/audioAutomationEngine";
-import { defaultStudyBehavior } from "@/services/studyBehaviorTracker";
 
 const availableCourses = [
   {
@@ -51,7 +45,7 @@ type SpotifyPodcast = {
   spotifyUrl: string;
   embedUrl: string | null;
   category: string;
-  kind?: "episode" | "show";
+  kind?: "episode" | "playlist" | "show";
 };
 
 type SpotifyConnection = {
@@ -84,9 +78,27 @@ function DashboardContent() {
   const [spotifyMessage, setSpotifyMessage] = useState<string | null>(null);
   const [spotifyConnection, setSpotifyConnection] = useState<SpotifyConnection | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("courses");
-  const [focusModeActive, setFocusModeActive] = useState(false);
-  const [audioPlaying, setAudioPlaying] = useState(true);
-  const audioDecision = runAudioAutomationEngine(defaultStudyBehavior);
+  const spotifyRows = useMemo(
+    () =>
+      [
+        {
+          title: "Episodes To Play Now",
+          subtitle: "Tap one and it opens in the player.",
+          items: spotifyPodcasts.filter((item) => item.kind === "episode"),
+        },
+        {
+          title: "Study Playlists",
+          subtitle: "Longer audio for coding, reading, and focus sessions.",
+          items: spotifyPodcasts.filter((item) => item.kind === "playlist"),
+        },
+        {
+          title: "Podcast Shows",
+          subtitle: "Open a full show and explore its episodes in the Spotify embed.",
+          items: spotifyPodcasts.filter((item) => item.kind === "show"),
+        },
+      ].filter((row) => row.items.length > 0),
+    [spotifyPodcasts]
+  );
 
   useEffect(() => {
     if (activeSection !== "spotify") return;
@@ -217,6 +229,22 @@ function DashboardContent() {
             </nav>
 
             <div className="flex items-center justify-between gap-2 lg:justify-end">
+              {activeSection === "spotify" && selectedSpotifyPodcast && (
+                <div className="hidden max-w-64 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-left text-xs text-[#f6f1e8] lg:flex">
+                  <span
+                    className="size-8 shrink-0 rounded-full bg-[#141416] bg-cover bg-center"
+                    style={
+                      selectedSpotifyPodcast.imageUrl
+                        ? { backgroundImage: `url(${selectedSpotifyPodcast.imageUrl})` }
+                        : undefined
+                    }
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{selectedSpotifyPodcast.title}</p>
+                    <p className="truncate text-[#d6d0c6]/55">Selected audio</p>
+                  </div>
+                </div>
+              )}
               <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Home
               </Link>
@@ -261,12 +289,6 @@ function DashboardContent() {
 
             {activeSection === "spotify" && (
               <div className="-m-3 space-y-4 rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
-                <FocusMode
-                  active={focusModeActive}
-                  behavior={defaultStudyBehavior}
-                  recommendation={audioDecision.recommendation}
-                  onExit={() => setFocusModeActive(false)}
-                />
                 {!spotifyConnection?.connected ? (
                   <section className="grid min-h-[520px] place-items-center overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(177,18,38,0.35),transparent_32%),linear-gradient(135deg,#171719_0%,#080809_52%,#050506_100%)] p-4 text-center shadow-2xl shadow-black/70 sm:min-h-[620px] sm:rounded-[1.75rem] sm:p-6">
                     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
@@ -306,7 +328,7 @@ function DashboardContent() {
                 ) : (
                   <>
                 <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,#171719_0%,#080809_44%,#36080c_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
-                  <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr] lg:gap-6">
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] xl:gap-6">
                     <div className="space-y-5">
                       <Badge className="w-fit border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
                         Curated audio library
@@ -337,158 +359,101 @@ function DashboardContent() {
                           </button>
                         ))}
                       </div>
-                      <div className="grid gap-3 sm:flex sm:flex-wrap">
-                        <Button
-                          type="button"
-                          onClick={() => setFocusModeActive(true)}
-                          className="bg-[#b11226] text-white hover:bg-[#8f0e1f]"
-                        >
-                          Start Focus Mode
-                        </Button>
-                        {spotifyConnection?.connected ? (
-                          <div className="rounded-full border border-green-400/30 bg-green-500/10 px-4 py-2 text-xs font-semibold text-green-100">
-                            Connected as {spotifyConnection.profile?.name ?? "Spotify user"}
-                            {spotifyConnection.profile?.product
-                              ? ` · ${spotifyConnection.profile.product}`
-                              : ""}
-                          </div>
-                        ) : (
-                          <Link
-                            href="/api/auth/spotify/start"
-                            className={cn(
-                              buttonVariants({ variant: "outline" }),
-                              "border-white/15 bg-white/5 text-[#f6f1e8] hover:bg-white/10"
-                            )}
-                          >
-                            <Link2 className="mr-2 size-4" />
-                            Connect Spotify
-                          </Link>
-                        )}
+                      <div className="rounded-full border border-green-400/30 bg-green-500/10 px-4 py-2 text-xs font-semibold text-green-100">
+                        Connected as {spotifyConnection.profile?.name ?? "Spotify user"}
+                        {spotifyConnection.profile?.product
+                          ? ` · ${spotifyConnection.profile.product}`
+                          : ""}
                       </div>
                     </div>
 
-                    <div className="rounded-[1.5rem] border border-white/10 bg-black/45 p-3 shadow-2xl shadow-black/50 backdrop-blur sm:p-4">
-                      <p className="mb-3 flex items-center gap-2 text-sm font-bold">
-                        <PlayCircle className="size-4 text-blue-300" />
-                        Now selected
-                      </p>
-                      {selectedSpotifyPodcast ? (
-                        <div className="space-y-4">
-                          <div
-                            className="aspect-[16/10] rounded-2xl bg-[#141416] bg-cover bg-center shadow-2xl shadow-black/50 ring-1 ring-white/10 sm:aspect-square"
-                            style={
-                              selectedSpotifyPodcast.imageUrl
-                                ? {
-                                    backgroundImage: `url(${selectedSpotifyPodcast.imageUrl})`,
-                                  }
-                                : undefined
-                            }
+                    <Card className="border-white/10 bg-[#0b0b0d]/90 text-[#f6f1e8] shadow-xl shadow-black/40">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                          <PlayCircle className="size-5 text-[#b11226]" />
+                          Player
+                        </CardTitle>
+                        <p className="text-sm text-[#d6d0c6]/60">
+                          {selectedSpotifyPodcast
+                            ? selectedSpotifyPodcast.title
+                            : "Choose an episode, playlist, or show below."}
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {selectedSpotifyPodcast?.embedUrl ? (
+                          <iframe
+                            title={`Spotify player for ${selectedSpotifyPodcast.title}`}
+                            src={selectedSpotifyPodcast.embedUrl}
+                            width="100%"
+                            height="352"
+                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                            loading="lazy"
+                            className="min-h-[240px] rounded-2xl border-0"
                           />
-                          <div>
-                            <p className="line-clamp-1 text-xl font-black">
-                              {selectedSpotifyPodcast.title}
-                            </p>
-                            <p className="line-clamp-1 text-sm text-[#d6d0c6]/60">
-                              {selectedSpotifyPodcast.publisher}
-                            </p>
+                        ) : (
+                          <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
+                            <div>
+                              <p className="font-semibold text-[#f6f1e8]">
+                                Choose something to play.
+                              </p>
+                              <p className="mt-2">
+                                Spotify recommendations are loading below.
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex aspect-square items-center justify-center rounded-2xl bg-white/5 text-white/50">
-                          <Podcast className="size-12" />
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
                 </section>
 
-                <section className="grid gap-4 xl:grid-cols-[1fr_0.85fr] xl:gap-5">
-                  <AudioRecommendationPanel
-                    decision={audioDecision}
-                    behavior={defaultStudyBehavior}
-                  />
-                  <StudyInsightsPanel behavior={defaultStudyBehavior} />
-                </section>
-
-                <section className="grid gap-4 xl:grid-cols-[minmax(320px,420px)_1fr] xl:gap-5">
-                  <Card className="border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
-                        <Disc3 className="size-5 text-[#b11226]" />
-                        Now Playing
-                      </CardTitle>
+                <section className="space-y-5 rounded-[1.5rem] border border-white/10 bg-[#0b0b0d] p-4 shadow-xl shadow-black/40 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-black">Browse Spotify Audio</h3>
                       <p className="text-sm text-[#d6d0c6]/60">
-                        Use the embedded Spotify player below. Select any card
-                        on the right to switch what plays here.
+                        Scroll sideways, pick one, and it opens in the player above.
                       </p>
-                    </CardHeader>
-                    <CardContent>
-                      {selectedSpotifyPodcast?.embedUrl ? (
-                        <iframe
-                          title={`Spotify player for ${selectedSpotifyPodcast.title}`}
-                          src={selectedSpotifyPodcast.embedUrl}
-                          width="100%"
-                          height="352"
-                          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                          loading="lazy"
-                          className="min-h-[220px] rounded-2xl border-0"
+                    </div>
+                    <Badge className="border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
+                      {spotifyCategory}
+                    </Badge>
+                  </div>
+                  {spotifyMessage && (
+                    <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-[#d6d0c6]/65">
+                      {spotifyMessage}
+                    </p>
+                  )}
+                  {spotifyLoading ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {[1, 2, 3, 4].map((item) => (
+                        <div
+                          key={item}
+                          className="h-64 min-w-64 animate-pulse rounded-2xl bg-white/10"
                         />
-                      ) : (
-                        <div className="grid min-h-[260px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
-                          <div>
-                            <p className="font-semibold text-[#f6f1e8]">
-                              Loading playable Spotify audio...
-                            </p>
-                            <p className="mt-2">
-                              Choose a topic or wait for Spotify recommendations
-                              to finish loading.
-                            </p>
-                          </div>
+                      ))}
+                    </div>
+                  ) : spotifyRows.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
+                      <p className="font-semibold text-[#f6f1e8]">
+                        No playable Spotify audio loaded yet.
+                      </p>
+                      <p className="mt-2">
+                        Try another topic filter. If this keeps happening,
+                        reconnect Spotify.
+                      </p>
+                    </div>
+                  ) : (
+                    spotifyRows.map((row) => (
+                      <div key={row.title} className="space-y-3">
+                        <div>
+                          <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-[#f6f1e8]">
+                            {row.title}
+                          </h4>
+                          <p className="text-xs text-[#d6d0c6]/55">{row.subtitle}</p>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
-                    <CardHeader className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
-                          <Podcast className="size-5 text-blue-300" />
-                          Playable Recommendations
-                        </CardTitle>
-                        <Badge className="border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
-                          {spotifyCategory}
-                        </Badge>
-                      </div>
-                      {spotifyMessage && (
-                        <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-[#d6d0c6]/65">
-                          {spotifyMessage}
-                        </p>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      {spotifyLoading ? (
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          {[1, 2, 3, 4, 5, 6].map((item) => (
-                            <div
-                              key={item}
-                              className="h-44 animate-pulse rounded-2xl bg-white/10"
-                            />
-                          ))}
-                        </div>
-                      ) : spotifyPodcasts.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
-                          <p className="font-semibold text-[#f6f1e8]">
-                            No playable Spotify recommendations loaded yet.
-                          </p>
-                          <p className="mt-2">
-                            Try another topic filter. If this keeps happening,
-                            reconnect Spotify.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-                          {spotifyPodcasts.map((podcast, index) => {
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                          {row.items.map((podcast) => {
                             const selected = selectedSpotifyPodcast?.id === podcast.id;
                             return (
                               <button
@@ -496,32 +461,32 @@ function DashboardContent() {
                                 type="button"
                                 onClick={() => setSelectedSpotifyPodcast(podcast)}
                                 className={cn(
-                                  "group overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
+                                  "group min-w-64 max-w-64 overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
                                   selected
                                     ? "border-[#b11226] shadow-lg shadow-[#b11226]/20"
                                     : "border-white/10"
                                 )}
                               >
                                 <div
-                                  className="h-32 bg-[#141416] bg-cover bg-center sm:h-36"
+                                  className="h-36 bg-[#141416] bg-cover bg-center"
                                   style={
                                     podcast.imageUrl
                                       ? { backgroundImage: `url(${podcast.imageUrl})` }
                                       : undefined
                                   }
                                 >
-                                  <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/70 p-3">
+                                  <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/75 p-3">
                                     <Badge className="bg-black/70 text-white hover:bg-black/70">
-                                      #{index + 1}
+                                      {podcast.kind ?? "audio"}
                                     </Badge>
-                                    <span className="rounded-full bg-[#b11226] p-2 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                    <span className="rounded-full bg-[#b11226] p-2 text-white opacity-90 transition-transform group-hover:scale-105">
                                       <PlayCircle className="size-4 fill-current" />
                                     </span>
                                   </div>
                                 </div>
                                 <div className="space-y-2 p-4">
                                   <div>
-                                    <p className="line-clamp-1 font-bold text-[#f6f1e8]">
+                                    <p className="line-clamp-2 font-bold text-[#f6f1e8]">
                                       {podcast.title}
                                     </p>
                                     <p className="line-clamp-1 text-xs text-[#d6d0c6]/50">
@@ -531,30 +496,22 @@ function DashboardContent() {
                                   <p className="line-clamp-3 text-xs leading-relaxed text-[#d6d0c6]/60">
                                     {podcast.description}
                                   </p>
-                                  <div className="flex flex-wrap gap-2 pt-1">
-                                    <Badge className="bg-white/10 text-[#f6f1e8] hover:bg-white/10">
-                                      {podcast.kind ?? "audio"}
-                                    </Badge>
-                                    <Badge className="bg-blue-500/15 text-blue-200 hover:bg-blue-500/15">
-                                      {podcast.kind === "episode"
-                                        ? `${podcast.episodeCount} min`
+                                  <Badge className="bg-blue-500/15 text-blue-200 hover:bg-blue-500/15">
+                                    {podcast.kind === "episode"
+                                      ? `${podcast.episodeCount} min`
+                                      : podcast.kind === "playlist"
+                                        ? `${podcast.episodeCount} tracks`
                                         : `${podcast.episodeCount} episodes`}
-                                    </Badge>
-                                  </div>
+                                  </Badge>
                                 </div>
                               </button>
                             );
                           })}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </div>
+                    ))
+                  )}
                 </section>
-                <NowPlayingBar
-                  recommendation={audioDecision.recommendation}
-                  playing={audioPlaying}
-                  onTogglePlay={() => setAudioPlaying((value) => !value)}
-                />
                   </>
                 )}
               </div>

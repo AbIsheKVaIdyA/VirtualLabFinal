@@ -10,7 +10,7 @@ import { VoicePanel } from "@/components/voice/VoicePanel";
 import { usePresence } from "@/hooks/usePresence";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
 import { moderateMessage } from "@/services/aiModeration";
-import { createOptimisticMessage } from "@/store/chatStore";
+import { createOptimisticMessage, useChatMessageStore } from "@/store/chatStore";
 
 export function ChatWindow({
   tenantId,
@@ -23,11 +23,13 @@ export function ChatWindow({
   currentUser: { id: string; name: string };
   initialMessages: Message[];
 }) {
-  const { messages, setMessages, isRealtime } = useRealtimeMessages({
+  const { messages, isRealtime } = useRealtimeMessages({
     tenantId,
     channelId: activeChannel.id,
     initialMessages,
   });
+  const upsertMessage = useChatMessageStore((state) => state.upsertMessage);
+  const updateMessage = useChatMessageStore((state) => state.updateMessage);
   const presence = usePresence({
     tenantId,
     channelId: activeChannel.id,
@@ -50,7 +52,7 @@ export function ChatWindow({
       content,
     });
 
-    setMessages((current) => [...current, optimistic]);
+    upsertMessage(activeChannel.id, optimistic);
 
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -64,19 +66,11 @@ export function ChatWindow({
     });
 
     if (error) {
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === optimistic.id ? { ...message, optimistic: false } : message
-        )
-      );
+      updateMessage(activeChannel.id, optimistic.id, { optimistic: false });
       return;
     }
 
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === optimistic.id ? { ...message, optimistic: false } : message
-      )
-    );
+    updateMessage(activeChannel.id, optimistic.id, { optimistic: false });
   };
 
   return (

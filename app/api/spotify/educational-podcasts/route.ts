@@ -46,12 +46,33 @@ type SpotifyEpisode = {
   };
 };
 
+type SpotifyPlaylist = {
+  id: string;
+  name: string;
+  description: string;
+  external_urls?: {
+    spotify?: string;
+  };
+  images?: Array<{
+    url: string;
+  }>;
+  owner?: {
+    display_name?: string;
+  };
+  tracks?: {
+    total?: number;
+  };
+};
+
 type SpotifySearchResponse = {
   shows?: {
     items?: Array<SpotifyShow | null>;
   };
   episodes?: {
     items?: Array<SpotifyEpisode | null>;
+  };
+  playlists?: {
+    items?: Array<SpotifyPlaylist | null>;
   };
 };
 
@@ -154,7 +175,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = new URLSearchParams({
       q: EDUCATIONAL_QUERIES[category],
-      type: "episode,show",
+      type: "episode,playlist,show",
       market: "US",
       limit: "8",
     });
@@ -214,14 +235,30 @@ export async function GET(request: NextRequest) {
           category: `${category} show`,
           kind: "show",
         })) ?? [];
-    const podcasts = [...episodes, ...shows];
+    const playlists =
+      searchData.playlists?.items
+        ?.filter((playlist): playlist is SpotifyPlaylist => Boolean(playlist))
+        .map((playlist) => ({
+          id: `playlist-${playlist.id}`,
+          title: playlist.name,
+          publisher: playlist.owner?.display_name ?? "Spotify playlist",
+          description: playlist.description,
+          episodeCount: playlist.tracks?.total ?? 0,
+          imageUrl: playlist.images?.[0]?.url ?? null,
+          spotifyUrl:
+            playlist.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlist.id}`,
+          embedUrl: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
+          category: `${category} playlist`,
+          kind: "playlist",
+        })) ?? [];
+    const podcasts = [...episodes, ...playlists, ...shows];
 
     return withRefreshedCookie({
       connected: true,
       source: "spotify",
       category,
       message: podcasts.length
-        ? "Playable Spotify episodes and shows loaded for your study topic."
+        ? "Playable Spotify audio loaded for your study topic."
         : "No playable Spotify results matched this category yet. Try a different filter.",
       podcasts,
     });

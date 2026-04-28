@@ -6,6 +6,7 @@ import type {
   Server,
   Tenant,
 } from "@/lib/communication-types";
+import { create } from "zustand";
 
 const tenant: Tenant = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -93,3 +94,60 @@ export function createOptimisticMessage(input: {
     },
   };
 }
+
+type ChatMessageState = {
+  messagesByChannel: Record<string, Message[]>;
+  initializeChannel: (channelId: string, messages: Message[]) => void;
+  setChannelMessages: (channelId: string, messages: Message[]) => void;
+  upsertMessage: (channelId: string, message: Message) => void;
+  updateMessage: (channelId: string, messageId: string, patch: Partial<Message>) => void;
+};
+
+export const useChatMessageStore = create<ChatMessageState>((set) => ({
+  messagesByChannel: {},
+  initializeChannel: (channelId, messages) =>
+    set((state) => {
+      if (state.messagesByChannel[channelId]) return state;
+
+      return {
+        messagesByChannel: {
+          ...state.messagesByChannel,
+          [channelId]: messages,
+        },
+      };
+    }),
+  setChannelMessages: (channelId, messages) =>
+    set((state) => ({
+      messagesByChannel: {
+        ...state.messagesByChannel,
+        [channelId]: messages,
+      },
+    })),
+  upsertMessage: (channelId, message) =>
+    set((state) => {
+      const current = state.messagesByChannel[channelId] ?? [];
+      const exists = current.some((item) => item.id === message.id);
+
+      return {
+        messagesByChannel: {
+          ...state.messagesByChannel,
+          [channelId]: exists
+            ? current.map((item) => (item.id === message.id ? message : item))
+            : [...current, message],
+        },
+      };
+    }),
+  updateMessage: (channelId, messageId, patch) =>
+    set((state) => {
+      const current = state.messagesByChannel[channelId] ?? [];
+
+      return {
+        messagesByChannel: {
+          ...state.messagesByChannel,
+          [channelId]: current.map((message) =>
+            message.id === messageId ? { ...message, ...patch } : message
+          ),
+        },
+      };
+    }),
+}));
