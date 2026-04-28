@@ -77,12 +77,34 @@ type SpotifySearchResponse = {
 };
 
 const EDUCATIONAL_QUERIES: Record<string, string> = {
-  All: "education technology university learning programming podcast",
-  Python: "python programming education podcast",
-  "Web Development": "web development javascript react education podcast",
-  "Data Science": "data science machine learning education podcast",
-  Cybersecurity: "cybersecurity ethical hacking education podcast",
+  All: "US English education technology university learning programming podcast",
+  Java: "US English Java programming software engineering podcast",
+  Python: "US English python programming education podcast",
+  "Web Development": "US English web development javascript react education podcast",
+  "Data Science": "US English data science machine learning education podcast",
+  Cybersecurity: "US English cybersecurity ethical hacking education podcast",
+  AI: "US English artificial intelligence machine learning education podcast",
+  Cloud: "US English cloud computing AWS Azure DevOps podcast",
+  Career: "US English software engineering career interview podcast",
 };
+
+const NON_US_RESULT_TERMS = [
+  "india",
+  "hindi",
+  "tamil",
+  "telugu",
+  "bollywood",
+  "desi",
+];
+
+function isUSFocusedResult(input: {
+  title: string;
+  publisher: string;
+  description: string;
+}) {
+  const searchable = `${input.title} ${input.publisher} ${input.description}`.toLowerCase();
+  return !NON_US_RESULT_TERMS.some((term) => searchable.includes(term));
+}
 
 function parseSpotifyCookie(request: NextRequest) {
   const value = request.cookies.get("vl_spotify_tokens")?.value;
@@ -218,7 +240,8 @@ export async function GET(request: NextRequest) {
           embedUrl: `https://open.spotify.com/embed/episode/${episode.id}?utm_source=generator&theme=0`,
           category: `${category} episode`,
           kind: "episode",
-        })) ?? [];
+        }))
+        .filter(isUSFocusedResult) ?? [];
 
     const shows =
       searchData.shows?.items
@@ -234,7 +257,8 @@ export async function GET(request: NextRequest) {
           embedUrl: `https://open.spotify.com/embed/show/${show.id}?utm_source=generator&theme=0`,
           category: `${category} show`,
           kind: "show",
-        })) ?? [];
+        }))
+        .filter(isUSFocusedResult) ?? [];
     const playlists =
       searchData.playlists?.items
         ?.filter((playlist): playlist is SpotifyPlaylist => Boolean(playlist))
@@ -250,7 +274,8 @@ export async function GET(request: NextRequest) {
           embedUrl: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
           category: `${category} playlist`,
           kind: "playlist",
-        })) ?? [];
+        }))
+        .filter(isUSFocusedResult) ?? [];
     const podcasts = [...episodes, ...playlists, ...shows];
 
     return withRefreshedCookie({

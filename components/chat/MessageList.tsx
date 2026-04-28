@@ -3,11 +3,24 @@
 import type { Message } from "@/lib/communication-types";
 import { MessageItem } from "@/components/chat/MessageItem";
 
-export function MessageList({ messages }: { messages: Message[] }) {
+export function MessageList({
+  messages,
+  currentUserId,
+  onEdit,
+  onDelete,
+}: {
+  messages: Message[];
+  currentUserId: string;
+  onEdit: (message: Message, content: string) => void;
+  onDelete: (message: Message) => void;
+}) {
   if (!messages.length) {
     return (
       <div className="flex min-h-80 items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
-        No messages yet. Start the conversation.
+        <div className="text-center">
+          <p className="font-medium text-foreground">No messages yet</p>
+          <p className="mt-1 text-xs">Start the conversation in this room.</p>
+        </div>
       </div>
     );
   }
@@ -15,7 +28,13 @@ export function MessageList({ messages }: { messages: Message[] }) {
   return (
     <div className="space-y-1 overflow-y-auto pr-2">
       {messages.map((message) => (
-        <MessageItem key={message.id} message={message} />
+        <MessageItem
+          key={message.id}
+          message={message}
+          canManage={message.userId === currentUserId}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       ))}
     </div>
   );

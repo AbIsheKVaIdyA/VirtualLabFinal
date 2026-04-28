@@ -29,10 +29,14 @@ const availableCourses = [
 ];
 
 const courseCategories = [
+  "Java",
   "Python",
   "Web Development",
   "Data Science",
   "Cybersecurity",
+  "AI",
+  "Cloud",
+  "Career",
 ];
 
 type SpotifyPodcast = {
@@ -166,7 +170,7 @@ function DashboardContent() {
   return (
     <div
       className={cn(
-        "relative min-h-screen transition-colors duration-700",
+        "relative min-h-screen overflow-x-hidden transition-colors duration-700",
         activeSection === "spotify" && "bg-[#050505] text-white"
       )}
     >
@@ -179,7 +183,7 @@ function DashboardContent() {
         )}
       />
 
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
         <aside
           className={cn(
             "sticky top-2 z-30 rounded-2xl border border-border/70 bg-card/75 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/65 sm:top-4",
@@ -253,10 +257,10 @@ function DashboardContent() {
           </div>
         </aside>
 
-        <main className="space-y-4 lg:space-y-6">
+        <main className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
           <div
             className={cn(
-              "space-y-4 rounded-2xl border bg-card/60 p-3 animate-in fade-in duration-300 sm:p-4",
+              "min-w-0 space-y-4 overflow-x-hidden rounded-2xl border bg-card/60 p-3 animate-in fade-in duration-300 sm:p-4",
               activeSection === "spotify" &&
                 "border-white/10 bg-[#050506]/80 shadow-2xl shadow-black/40"
             )}
@@ -288,8 +292,30 @@ function DashboardContent() {
             )}
 
             {activeSection === "spotify" && (
-              <div className="-m-3 space-y-4 rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
-                {!spotifyConnection?.connected ? (
+              <div className="-m-3 min-w-0 space-y-4 overflow-x-hidden rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
+                {spotifyConnection === null ? (
+                  <section className="grid min-h-[520px] place-items-center overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(177,18,38,0.28),transparent_32%),linear-gradient(135deg,#171719_0%,#080809_52%,#050506_100%)] p-4 text-center shadow-2xl shadow-black/70 sm:min-h-[620px] sm:rounded-[1.75rem] sm:p-6">
+                    <div className="mx-auto max-w-xl space-y-5">
+                      <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#b11226]/20 text-[#f6f1e8] ring-1 ring-[#b11226]/30 sm:size-20 sm:rounded-3xl">
+                        <Podcast className="size-8 animate-pulse sm:size-10" />
+                      </div>
+                      <div>
+                        <Badge className="border border-white/10 bg-white/[0.05] text-[#f6f1e8] hover:bg-white/[0.05]">
+                          Checking Spotify
+                        </Badge>
+                        <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+                          Loading your audio workspace...
+                        </h2>
+                        <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-[#d6d0c6]/70">
+                          We are checking whether your Spotify account is connected.
+                        </p>
+                      </div>
+                      <div className="mx-auto h-2 max-w-xs overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full w-1/2 animate-pulse rounded-full bg-[#b11226]" />
+                      </div>
+                    </div>
+                  </section>
+                ) : !spotifyConnection.connected ? (
                   <section className="grid min-h-[520px] place-items-center overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(177,18,38,0.35),transparent_32%),linear-gradient(135deg,#171719_0%,#080809_52%,#050506_100%)] p-4 text-center shadow-2xl shadow-black/70 sm:min-h-[620px] sm:rounded-[1.75rem] sm:p-6">
                     <div className="mx-auto max-w-2xl space-y-5 sm:space-y-6">
                       <div className="mx-auto grid size-16 place-items-center rounded-2xl bg-[#b11226]/20 text-[#f6f1e8] ring-1 ring-[#b11226]/30 sm:size-20 sm:rounded-3xl">
@@ -327,7 +353,7 @@ function DashboardContent() {
                   </section>
                 ) : (
                   <>
-                <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,#171719_0%,#080809_44%,#36080c_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
+                <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,#171719_0%,#080809_44%,#36080c_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] xl:gap-6">
                     <div className="space-y-5">
                       <Badge className="w-fit border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
@@ -342,7 +368,7 @@ function DashboardContent() {
                           the embedded player without leaving your study flow.
                         </p>
                       </div>
-                      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                      <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
                         {["All", ...courseCategories].map((category) => (
                           <button
                             key={`spotify-${category}`}
@@ -407,7 +433,7 @@ function DashboardContent() {
                   </div>
                 </section>
 
-                <section className="space-y-5 rounded-[1.5rem] border border-white/10 bg-[#0b0b0d] p-4 shadow-xl shadow-black/40 sm:p-5">
+                <section className="min-w-0 space-y-5 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0b0b0d] p-4 shadow-xl shadow-black/40 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h3 className="text-xl font-black">Browse Spotify Audio</h3>
@@ -425,11 +451,11 @@ function DashboardContent() {
                     </p>
                   )}
                   {spotifyLoading ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2">
+                    <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-2">
                       {[1, 2, 3, 4].map((item) => (
                         <div
                           key={item}
-                          className="h-64 min-w-64 animate-pulse rounded-2xl bg-white/10"
+                          className="h-64 min-w-64 max-w-64 animate-pulse rounded-2xl bg-white/10"
                         />
                       ))}
                     </div>
@@ -445,14 +471,14 @@ function DashboardContent() {
                     </div>
                   ) : (
                     spotifyRows.map((row) => (
-                      <div key={row.title} className="space-y-3">
+                      <div key={row.title} className="min-w-0 space-y-3">
                         <div>
                           <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-[#f6f1e8]">
                             {row.title}
                           </h4>
                           <p className="text-xs text-[#d6d0c6]/55">{row.subtitle}</p>
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2">
+                        <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-2">
                           {row.items.map((podcast) => {
                             const selected = selectedSpotifyPodcast?.id === podcast.id;
                             return (

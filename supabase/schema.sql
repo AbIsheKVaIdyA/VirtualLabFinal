@@ -129,6 +129,17 @@ create policy "tenant users can insert messages"
     or tenant_id = '11111111-1111-4111-8111-111111111111'::uuid
   );
 
+create policy "tenant users can update own messages"
+  on public.messages for update
+  using (
+    tenant_id::text = auth.jwt() ->> 'tenant_id'
+    or tenant_id = '11111111-1111-4111-8111-111111111111'::uuid
+  )
+  with check (
+    tenant_id::text = auth.jwt() ->> 'tenant_id'
+    or tenant_id = '11111111-1111-4111-8111-111111111111'::uuid
+  );
+
 create policy "tenant users can read voice sessions"
   on public.voice_sessions for select
   using (tenant_id::text = auth.jwt() ->> 'tenant_id');

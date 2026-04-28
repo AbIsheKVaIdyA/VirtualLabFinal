@@ -30,6 +30,7 @@ export function ChatWindow({
   });
   const upsertMessage = useChatMessageStore((state) => state.upsertMessage);
   const updateMessage = useChatMessageStore((state) => state.updateMessage);
+  const removeMessage = useChatMessageStore((state) => state.removeMessage);
   const presence = usePresence({
     tenantId,
     channelId: activeChannel.id,
@@ -73,11 +74,61 @@ export function ChatWindow({
     updateMessage(activeChannel.id, optimistic.id, { optimistic: false });
   };
 
+  const editMessage = async (message: Message, content: string) => {
+    const moderation = moderateMessage(content);
+    if (moderation.action === "delete") return;
+
+    const editedAt = new Date().toISOString();
+    updateMessage(activeChannel.id, message.id, {
+      content,
+      editedAt,
+    });
+
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const { error } = await supabase
+      .from("messages")
+      .update({
+        content,
+        edited_at: editedAt,
+      })
+      .eq("id", message.id)
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      updateMessage(activeChannel.id, message.id, {
+        content: message.content,
+        editedAt: message.editedAt,
+      });
+    }
+  };
+
+  const deleteMessage = async (message: Message) => {
+    removeMessage(activeChannel.id, message.id);
+
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const { error } = await supabase
+      .from("messages")
+      .update({
+        deleted_at: new Date().toISOString(),
+      })
+      .eq("id", message.id)
+      .eq("user_id", currentUser.id);
+
+    if (error) {
+      upsertMessage(activeChannel.id, message);
+    }
+  };
+
   return (
-    <section className="flex h-full min-h-[560px] flex-col rounded-2xl border bg-card sm:min-h-[680px]">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5 sm:py-4">
+    <section className="flex h-full min-h-[560px] overflow-hidden rounded-2xl border bg-card shadow-xl shadow-black/10 sm:min-h-[680px]">
+      <div className="flex min-h-0 flex-1 flex-col">
+      <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b bg-card/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Hash className="size-5 text-primary" />
+          <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Hash className="size-5" />
+          </span>
           <div className="min-w-0">
             <p className="truncate font-semibold">{activeChannel.name}</p>
             <p className="text-xs text-muted-foreground">
@@ -85,14 +136,19 @@ export function ChatWindow({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="rounded-full border bg-background/70 px-3 py-1.5 flex items-center gap-2 text-xs text-muted-foreground">
           <Radio className="size-3.5" />
           {presence.onlineUsers.length} online
           {presence.isTyping && <span>• typing...</span>}
         </div>
       </header>
       <div className="flex-1 overflow-hidden p-3 sm:p-4">
-        <MessageList messages={messages} />
+        <MessageList
+          messages={messages}
+          currentUserId={currentUser.id}
+          onEdit={editMessage}
+          onDelete={deleteMessage}
+        />
       </div>
       <div className="border-t p-3 sm:p-4">
         <MessageInput
@@ -100,6 +156,7 @@ export function ChatWindow({
           onSend={sendMessage}
           onTyping={presence.sendTyping}
         />
+      </div>
       </div>
     </section>
   );

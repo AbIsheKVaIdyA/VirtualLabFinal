@@ -101,6 +101,7 @@ type ChatMessageState = {
   setChannelMessages: (channelId: string, messages: Message[]) => void;
   upsertMessage: (channelId: string, message: Message) => void;
   updateMessage: (channelId: string, messageId: string, patch: Partial<Message>) => void;
+  removeMessage: (channelId: string, messageId: string) => void;
 };
 
 export const useChatMessageStore = create<ChatMessageState>((set) => ({
@@ -147,6 +148,17 @@ export const useChatMessageStore = create<ChatMessageState>((set) => ({
           [channelId]: current.map((message) =>
             message.id === messageId ? { ...message, ...patch } : message
           ),
+        },
+      };
+    }),
+  removeMessage: (channelId, messageId) =>
+    set((state) => {
+      const current = state.messagesByChannel[channelId] ?? [];
+
+      return {
+        messagesByChannel: {
+          ...state.messagesByChannel,
+          [channelId]: current.filter((message) => message.id !== messageId),
         },
       };
     }),

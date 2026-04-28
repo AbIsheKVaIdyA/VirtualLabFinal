@@ -60,6 +60,13 @@ create policy "public can insert default tenant messages"
   for insert
   with check (tenant_id = '11111111-1111-4111-8111-111111111111'::uuid);
 
+drop policy if exists "public can update own default tenant messages" on public.messages;
+create policy "public can update own default tenant messages"
+  on public.messages
+  for update
+  using (tenant_id = '11111111-1111-4111-8111-111111111111'::uuid)
+  with check (tenant_id = '11111111-1111-4111-8111-111111111111'::uuid);
+
 do $$
 begin
   alter publication supabase_realtime add table public.messages;

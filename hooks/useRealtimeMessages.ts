@@ -38,6 +38,7 @@ export function useRealtimeMessages(input: {
   const initializeChannel = useChatMessageStore((state) => state.initializeChannel);
   const setChannelMessages = useChatMessageStore((state) => state.setChannelMessages);
   const upsertMessage = useChatMessageStore((state) => state.upsertMessage);
+  const removeMessage = useChatMessageStore((state) => state.removeMessage);
 
   useEffect(() => {
     initializeChannel(input.channelId, input.initialMessages ?? []);
@@ -68,13 +69,24 @@ export function useRealtimeMessages(input: {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
           filter: `channel_id=eq.${input.channelId}`,
         },
         (payload) => {
-          upsertMessage(input.channelId, mapMessage(payload.new));
+          if (payload.eventType === "DELETE") {
+            removeMessage(input.channelId, String(payload.old.id));
+            return;
+          }
+
+          const nextMessage = mapMessage(payload.new);
+          if (nextMessage.deletedAt) {
+            removeMessage(input.channelId, nextMessage.id);
+            return;
+          }
+
+          upsertMessage(input.channelId, nextMessage);
         }
       )
       .subscribe((status) => {
@@ -85,11 +97,11 @@ export function useRealtimeMessages(input: {
       mounted = false;
       void client.removeChannel(channel);
     };
-  }, [input.channelId, input.tenantId, setChannelMessages, upsertMessage]);
+  }, [input.channelId, input.tenantId, removeMessage, setChannelMessages, upsertMessage]);
 
   const sortedMessages = useMemo(
     () =>
-      [...messages].sort(
+      messages.filter((message) => !message.deletedAt).sort(
         (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       ),
     [messages]
