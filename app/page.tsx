@@ -37,7 +37,7 @@ const productPillars = [
     iconClass: "text-primary",
   },
   {
-    title: "Learning Community",
+    title: "Community Workspace",
     description:
       "A built-in community workspace with course channels, realtime chat, voice-ready rooms, and moderation scaffolding.",
     icon: Disc3,
@@ -196,7 +196,7 @@ export default function Home() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Users className="size-4 text-indigo-300" />
-                  Built-In Learning Community
+                  Built-In Community Workspace
                 </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">

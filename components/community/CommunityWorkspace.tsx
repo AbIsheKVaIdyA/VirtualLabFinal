@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Mic2, Radio, ShieldCheck, Sparkles, Users2 } from "lucide-react";
+import { Mic2, Radio, ShieldCheck, Users2 } from "lucide-react";
 
 import { ChannelSidebar } from "@/components/chat/ChannelSidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { ServerSidebar } from "@/components/chat/ServerSidebar";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { isSupabaseConfigured } from "@/lib/supabase-client";
 import { cn } from "@/lib/utils";
 import { localChatSeed } from "@/store/chatStore";
 
@@ -70,10 +69,6 @@ export function CommunityWorkspace({
       <header className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_0%_0%,rgba(177,18,38,0.28),transparent_34%),linear-gradient(135deg,#121217_0%,#08080a_55%,#030304_100%)] px-4 py-4 text-[#f6f1e8] shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-[#d6d0c6]/45">
-              <Sparkles className="size-3.5 text-[#b11226]" />
-              Learning Community
-            </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
               {activeServer?.name ?? "Virtual Lab"}
             </h1>
@@ -82,9 +77,6 @@ export function CommunityWorkspace({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant={isSupabaseConfigured ? "default" : "secondary"}>
-              {isSupabaseConfigured ? "Realtime ready" : "Local mode"}
-            </Badge>
             <Badge className="bg-white/10 text-[#f6f1e8] hover:bg-white/10">
               #{activeChannel.name}
             </Badge>

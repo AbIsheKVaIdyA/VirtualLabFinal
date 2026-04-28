@@ -6,6 +6,7 @@ import {
   BookOpenText,
   Disc3,
   Link2,
+  ListMusic,
   PlayCircle,
   Podcast,
   SkipBack,
@@ -53,7 +54,7 @@ type SpotifyPodcast = {
   spotifyUrl: string;
   embedUrl: string | null;
   category: string;
-  kind?: "episode" | "playlist" | "show";
+  kind?: "episode" | "playlist" | "show" | "track";
   topic?: string;
 };
 
@@ -71,6 +72,8 @@ type SpotifyConnection = {
 
 type SectionId = "courses" | "spotify" | "community";
 
+const SPOTIFY_LAST_AUDIO_KEY = "vl:last-spotify-audio";
+
 const navSections: Array<{ id: SectionId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "courses", label: "My Courses", icon: BookOpenText },
   { id: "spotify", label: "Spotify Podcasts", icon: Podcast },
@@ -86,9 +89,10 @@ function DashboardContent() {
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyMessage, setSpotifyMessage] = useState<string | null>(null);
   const [spotifyConnection, setSpotifyConnection] = useState<SpotifyConnection | null>(null);
-  const [episodeDrawerShow, setEpisodeDrawerShow] = useState<SpotifyPodcast | null>(null);
-  const [showEpisodes, setShowEpisodes] = useState<SpotifyPodcast[]>([]);
-  const [showEpisodesLoading, setShowEpisodesLoading] = useState(false);
+  const [audioDrawerItem, setAudioDrawerItem] = useState<SpotifyPodcast | null>(null);
+  const [audioDrawerItems, setAudioDrawerItems] = useState<SpotifyPodcast[]>([]);
+  const [audioDrawerLoading, setAudioDrawerLoading] = useState(false);
+  const [lastSpotifyPodcast, setLastSpotifyPodcast] = useState<SpotifyPodcast | null>(null);
   const [activeSection, setActiveSection] = useState<SectionId>("courses");
   const spotifyRows = useMemo(
     () => {
@@ -107,42 +111,76 @@ function DashboardContent() {
   const selectedAudioIndex = selectedSpotifyPodcast
     ? spotifyPodcasts.findIndex((item) => item.id === selectedSpotifyPodcast.id)
     : -1;
+  const totalDrawerItems = audioDrawerItems.length || audioDrawerItem?.episodeCount || 0;
+  const remainingDrawerItems = audioDrawerItems.length
+    ? Math.max(
+        0,
+        audioDrawerItems.length -
+          audioDrawerItems.findIndex((item) => item.id === selectedSpotifyPodcast?.id) -
+          1
+      )
+    : totalDrawerItems;
+  const selectSpotifyAudio = (item: SpotifyPodcast | null) => {
+    setSelectedSpotifyPodcast(item);
+    if (!item) return;
+
+    setLastSpotifyPodcast(item);
+    window.localStorage.setItem(SPOTIFY_LAST_AUDIO_KEY, JSON.stringify(item));
+  };
   const selectNextSpotifyItem = () => {
     if (!spotifyPodcasts.length) return;
     const nextIndex =
       selectedAudioIndex >= 0 ? (selectedAudioIndex + 1) % spotifyPodcasts.length : 0;
-    setSelectedSpotifyPodcast(spotifyPodcasts[nextIndex]);
+    selectSpotifyAudio(spotifyPodcasts[nextIndex]);
   };
   const selectPreviousSpotifyItem = () => {
     if (!spotifyPodcasts.length) return;
     const previousIndex =
       selectedAudioIndex > 0 ? selectedAudioIndex - 1 : spotifyPodcasts.length - 1;
-    setSelectedSpotifyPodcast(spotifyPodcasts[previousIndex]);
+    selectSpotifyAudio(spotifyPodcasts[previousIndex]);
   };
-  const openShowEpisodes = (show: SpotifyPodcast) => {
-    const showId = show.id.replace(/^show-/, "");
-    setEpisodeDrawerShow(show);
-    setShowEpisodes([]);
-    setShowEpisodesLoading(true);
+  const openAudioDetails = (item: SpotifyPodcast) => {
+    setAudioDrawerItem(item);
+    setAudioDrawerItems(item.kind === "episode" || item.kind === "track" ? [item] : []);
 
-    fetch(`/api/spotify/show-episodes?showId=${encodeURIComponent(showId)}`, {
-      cache: "no-store",
-    })
-      .then((res) => res.json())
-      .then((data: { episodes?: SpotifyPodcast[] }) =>
-        setShowEpisodes(data.episodes ?? [])
-      )
-      .catch(() => setShowEpisodes([]))
-      .finally(() => setShowEpisodesLoading(false));
-  };
-  const handleSpotifyCardClick = (item: SpotifyPodcast) => {
-    if (item.kind === "show") {
-      openShowEpisodes(item);
+    if (item.kind === "episode" || item.kind === "track") {
+      setAudioDrawerLoading(false);
       return;
     }
 
-    setSelectedSpotifyPodcast(item);
+    const endpoint =
+      item.kind === "playlist"
+        ? `/api/spotify/playlist-items?playlistId=${encodeURIComponent(
+            item.id.replace(/^playlist-/, "")
+          )}`
+        : `/api/spotify/show-episodes?showId=${encodeURIComponent(item.id.replace(/^show-/, ""))}`;
+
+    setAudioDrawerLoading(true);
+
+    fetch(endpoint, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data: { items?: SpotifyPodcast[]; episodes?: SpotifyPodcast[] }) =>
+        setAudioDrawerItems(data.items ?? data.episodes ?? [])
+      )
+      .catch(() => setAudioDrawerItems([]))
+      .finally(() => setAudioDrawerLoading(false));
   };
+  const handleSpotifyCardClick = (item: SpotifyPodcast) => {
+    openAudioDetails(item);
+  };
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(SPOTIFY_LAST_AUDIO_KEY);
+    if (!stored) return;
+
+    try {
+      setLastSpotifyPodcast(JSON.parse(stored) as SpotifyPodcast);
+    } catch {
+      window.localStorage.removeItem(SPOTIFY_LAST_AUDIO_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     if (activeSection !== "spotify") return;
@@ -187,11 +225,17 @@ function DashboardContent() {
         }) => {
           const podcasts = data.podcasts ?? [];
           setSpotifyPodcasts(podcasts);
-          setSelectedSpotifyPodcast((current) =>
-            current && podcasts.some((podcast) => podcast.id === current.id)
-              ? current
-              : podcasts[0] ?? null
-          );
+          setSelectedSpotifyPodcast((current) => {
+            if (current && podcasts.some((podcast) => podcast.id === current.id)) {
+              return current;
+            }
+
+            if (lastSpotifyPodcast && podcasts.some((podcast) => podcast.id === lastSpotifyPodcast.id)) {
+              return lastSpotifyPodcast;
+            }
+
+            return podcasts[0] ?? null;
+          });
           setSpotifyMessage(
             data.message ?? "Live Spotify results filtered for educational content."
           );
@@ -205,7 +249,7 @@ function DashboardContent() {
       .finally(() => setSpotifyLoading(false));
 
     return () => controller.abort();
-  }, [activeSection, spotifyCategory, spotifyConnection?.connected]);
+  }, [activeSection, spotifyCategory, spotifyConnection?.connected, lastSpotifyPodcast]);
 
   return (
     <div
@@ -274,7 +318,20 @@ function DashboardContent() {
 
             <div className="flex items-center justify-between gap-2 lg:justify-end">
               {activeSection === "spotify" && spotifyConnection?.connected && (
-                <div className="hidden max-w-80 items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-[#f6f1e8] lg:flex">
+                <div className="hidden max-w-[28rem] items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-[#f6f1e8] lg:flex">
+                  <span
+                    className="size-9 shrink-0 rounded-full border border-white/10 bg-[#141416] bg-cover bg-center"
+                    style={
+                      (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
+                        ? {
+                            backgroundImage: `url(${
+                              (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
+                            })`,
+                          }
+                        : undefined
+                    }
+                    aria-hidden="true"
+                  />
                   <button
                     type="button"
                     onClick={selectPreviousSpotifyItem}
@@ -287,11 +344,13 @@ function DashboardContent() {
                     type="button"
                     onClick={() =>
                       selectedSpotifyPodcast
-                        ? setSelectedSpotifyPodcast(selectedSpotifyPodcast)
+                        ? selectSpotifyAudio(selectedSpotifyPodcast)
+                        : lastSpotifyPodcast
+                          ? selectSpotifyAudio(lastSpotifyPodcast)
                         : selectNextSpotifyItem()
                     }
                     className="rounded-full bg-[#b11226] p-2 text-white transition-colors hover:bg-[#8f0e1f]"
-                    aria-label="Load selected Spotify item"
+                    aria-label="Resume selected Spotify item"
                   >
                     <PlayCircle className="size-3.5 fill-current" />
                   </button>
@@ -311,8 +370,10 @@ function DashboardContent() {
                   >
                     <SkipForward className="size-3.5" />
                   </button>
-                  <p className="ml-1 max-w-36 truncate text-[#d6d0c6]/65">
-                    {selectedSpotifyPodcast?.title ?? "Choose audio"}
+                  <p className="ml-1 max-w-40 truncate text-[#d6d0c6]/70">
+                    {selectedSpotifyPodcast?.title ??
+                      lastSpotifyPodcast?.title ??
+                      "Choose audio"}
                   </p>
                 </div>
               )}
@@ -469,6 +530,8 @@ function DashboardContent() {
                         <p className="text-sm text-[#d6d0c6]/60">
                           {selectedSpotifyPodcast
                             ? selectedSpotifyPodcast.title
+                            : lastSpotifyPodcast
+                              ? `Continue: ${lastSpotifyPodcast.title}`
                             : "Choose an episode, playlist, or show below."}
                         </p>
                       </CardHeader>
@@ -485,13 +548,26 @@ function DashboardContent() {
                           />
                         ) : (
                           <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
-                            <div>
+                            <div className="space-y-3">
                               <p className="font-semibold text-[#f6f1e8]">
-                                Choose something to play.
+                                {lastSpotifyPodcast
+                                  ? "Continue your last Spotify item."
+                                  : "Choose something to play."}
                               </p>
                               <p className="mt-2">
-                                Spotify recommendations are loading below.
+                                {lastSpotifyPodcast
+                                  ? "This reopens the same Spotify embed you were using."
+                                  : "Spotify recommendations are loading below."}
                               </p>
+                              {lastSpotifyPodcast && (
+                                <button
+                                  type="button"
+                                  onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
+                                  className="rounded-full bg-[#b11226] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f]"
+                                >
+                                  Continue listening
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -505,7 +581,7 @@ function DashboardContent() {
                     <div>
                       <h3 className="text-xl font-black">Browse Spotify Audio</h3>
                       <p className="text-sm text-[#d6d0c6]/60">
-                        Scroll sideways, pick one, and it opens in the player above.
+                        Scroll sideways and pick a card to open episodes, tracks, and play options.
                       </p>
                     </div>
                     <Badge className="border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
@@ -573,7 +649,13 @@ function DashboardContent() {
                                       {podcast.kind ?? "audio"}
                                     </Badge>
                                     <span className="rounded-full bg-[#b11226] px-3 py-2 text-xs font-bold text-white opacity-90 transition-transform group-hover:scale-105">
-                                      {podcast.kind === "show" ? "Episodes" : <PlayCircle className="size-4 fill-current" />}
+                                      {podcast.kind === "episode" || podcast.kind === "track" ? (
+                                        <PlayCircle className="size-4 fill-current" />
+                                      ) : podcast.kind === "playlist" ? (
+                                        "Tracks"
+                                      ) : (
+                                        "Episodes"
+                                      )}
                                     </span>
                                   </div>
                                 </div>
@@ -590,7 +672,7 @@ function DashboardContent() {
                                     {podcast.description}
                                   </p>
                                   <Badge className="bg-blue-500/15 text-blue-200 hover:bg-blue-500/15">
-                                    {podcast.kind === "episode"
+                                    {podcast.kind === "episode" || podcast.kind === "track"
                                       ? `${podcast.episodeCount} min`
                                       : podcast.kind === "playlist"
                                         ? `${podcast.episodeCount} tracks`
@@ -617,67 +699,112 @@ function DashboardContent() {
           </div>
         </main>
       </div>
-      {episodeDrawerShow && (
+      {audioDrawerItem && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-md">
           <div className="max-h-[86vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#08080a] text-[#f6f1e8] shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#d6d0c6]/50">
-                  Episodes
-                </p>
-                <h3 className="mt-1 line-clamp-2 text-2xl font-black">
-                  {episodeDrawerShow.title}
-                </h3>
-                <p className="mt-1 line-clamp-1 text-sm text-[#d6d0c6]/60">
-                  {episodeDrawerShow.publisher}
-                </p>
+              <div className="flex min-w-0 gap-4">
+                <div
+                  className="hidden size-20 shrink-0 rounded-2xl border border-white/10 bg-[#141416] bg-cover bg-center sm:block"
+                  style={
+                    audioDrawerItem.imageUrl
+                      ? { backgroundImage: `url(${audioDrawerItem.imageUrl})` }
+                      : undefined
+                  }
+                  aria-hidden="true"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#d6d0c6]/50">
+                    {audioDrawerItem.kind === "playlist"
+                      ? "Playlist tracks"
+                      : audioDrawerItem.kind === "episode" || audioDrawerItem.kind === "track"
+                        ? "Audio details"
+                        : "Show episodes"}
+                  </p>
+                  <h3 className="mt-1 line-clamp-2 text-2xl font-black">
+                    {audioDrawerItem.title}
+                  </h3>
+                  <p className="mt-1 line-clamp-1 text-sm text-[#d6d0c6]/60">
+                    {audioDrawerItem.publisher}
+                  </p>
+                  <p className="mt-2 text-xs text-[#d6d0c6]/55">
+                    {totalDrawerItems
+                      ? `${totalDrawerItems} total · ${remainingDrawerItems} left from current selection`
+                      : "Open an item below to play it in Virtual Lab."}
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEpisodeDrawerShow(null)}
-                className="rounded-full border border-white/10 p-2 transition-colors hover:bg-white/10"
-                aria-label="Close episodes"
-              >
-                <X className="size-4" />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                {lastSpotifyPodcast && !selectedSpotifyPodcast && (
+                  <button
+                    type="button"
+                    onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
+                    className="hidden rounded-full border border-[#b11226]/40 bg-[#b11226]/20 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#b11226]/30 sm:inline-flex"
+                  >
+                    Continue
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAudioDrawerItem(null)}
+                  className="rounded-full border border-white/10 p-2 transition-colors hover:bg-white/10"
+                  aria-label="Close audio details"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
             </div>
             <div className="max-h-[62vh] overflow-y-auto p-4">
-              {showEpisodesLoading ? (
+              {audioDrawerLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4].map((item) => (
                     <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/10" />
                   ))}
                 </div>
-              ) : showEpisodes.length ? (
+              ) : audioDrawerItems.length ? (
                 <div className="space-y-3">
-                  {showEpisodes.map((episode, index) => (
-                    <button
-                      key={episode.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSpotifyPodcast(episode);
-                        setEpisodeDrawerShow(null);
-                      }}
-                      className="flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.07]"
-                    >
-                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#b11226]/20 text-sm font-bold text-[#f6f1e8]">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="line-clamp-2 text-sm font-bold">{episode.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-[#d6d0c6]/60">
-                          {episode.description}
-                        </p>
-                        <p className="mt-2 text-xs text-blue-200">
-                          {episode.episodeCount} min · play in Virtual Lab
-                        </p>
+                  {audioDrawerItems.map((item, index) => {
+                    const selected = selectedSpotifyPodcast?.id === item.id;
+                    const leftAfterThis = Math.max(0, audioDrawerItems.length - index - 1);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          "flex w-full gap-3 rounded-2xl border bg-white/[0.03] p-3 text-left transition-colors",
+                          selected ? "border-[#b11226]" : "border-white/10"
+                        )}
+                      >
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#b11226]/20 text-sm font-bold text-[#f6f1e8]">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-bold">{item.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-[#d6d0c6]/60">
+                            {item.description}
+                          </p>
+                          <p className="mt-2 text-xs text-blue-200">
+                            {item.episodeCount} min · {leftAfterThis} left after this
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectSpotifyAudio(item);
+                            setAudioDrawerItem(null);
+                          }}
+                          className="self-center rounded-full bg-[#b11226] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f]"
+                        >
+                          {selected ? "Playing" : "Play"}
+                        </button>
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-[#d6d0c6]/65">
-                  No episodes loaded for this show. Try another show.
+                  <ListMusic className="mx-auto mb-3 size-8 text-[#d6d0c6]/40" />
+                  No playable items loaded here. Try another recommendation.
                 </div>
               )}
             </div>
