@@ -88,6 +88,17 @@ const EDUCATIONAL_QUERIES: Record<string, string> = {
   Career: "US English software engineering career interview podcast",
 };
 
+const FEATURED_TOPICS = [
+  "Python",
+  "Java",
+  "Cybersecurity",
+  "Web Development",
+  "Data Science",
+  "AI",
+  "Cloud",
+  "Career",
+];
+
 const NON_US_RESULT_TERMS = [
   "india",
   "hindi",
@@ -195,11 +206,14 @@ export async function GET(request: NextRequest) {
   };
 
   try {
+    const categoriesToSearch = category === "All" ? FEATURED_TOPICS : [category];
+    const results = await Promise.all(
+      categoriesToSearch.map(async (topic) => {
     const searchParams = new URLSearchParams({
-      q: EDUCATIONAL_QUERIES[category],
+          q: EDUCATIONAL_QUERIES[topic],
       type: "episode,playlist,show",
       market: "US",
-      limit: "8",
+          limit: category === "All" ? "4" : "8",
     });
 
     const searchRes = await fetch(
@@ -213,13 +227,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (!searchRes.ok) {
-      return withRefreshedCookie({
-        connected: true,
-        source: "spotify",
-        category,
-        message: "Spotify search failed. Try reconnecting your account.",
-        podcasts: [],
-      });
+          return [];
     }
 
     const searchData = (await searchRes.json()) as SpotifySearchResponse;
@@ -238,8 +246,9 @@ export async function GET(request: NextRequest) {
           spotifyUrl:
             episode.external_urls?.spotify ?? `https://open.spotify.com/episode/${episode.id}`,
           embedUrl: `https://open.spotify.com/embed/episode/${episode.id}?utm_source=generator&theme=0`,
-          category: `${category} episode`,
+              category: `${topic} episode`,
           kind: "episode",
+              topic,
         }))
         .filter(isUSFocusedResult) ?? [];
 
@@ -255,8 +264,9 @@ export async function GET(request: NextRequest) {
           imageUrl: show.images?.[0]?.url ?? null,
           spotifyUrl: show.external_urls?.spotify ?? `https://open.spotify.com/show/${show.id}`,
           embedUrl: `https://open.spotify.com/embed/show/${show.id}?utm_source=generator&theme=0`,
-          category: `${category} show`,
+              category: `${topic} show`,
           kind: "show",
+              topic,
         }))
         .filter(isUSFocusedResult) ?? [];
     const playlists =
@@ -272,11 +282,15 @@ export async function GET(request: NextRequest) {
           spotifyUrl:
             playlist.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlist.id}`,
           embedUrl: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
-          category: `${category} playlist`,
+              category: `${topic} playlist`,
           kind: "playlist",
+              topic,
         }))
         .filter(isUSFocusedResult) ?? [];
-    const podcasts = [...episodes, ...playlists, ...shows];
+        return [...episodes, ...playlists, ...shows];
+      })
+    );
+    const podcasts = results.flat();
 
     return withRefreshedCookie({
       connected: true,

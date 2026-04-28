@@ -8,6 +8,10 @@ import {
   Link2,
   PlayCircle,
   Podcast,
+  SkipBack,
+  SkipForward,
+  Square,
+  X,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +54,7 @@ type SpotifyPodcast = {
   embedUrl: string | null;
   category: string;
   kind?: "episode" | "playlist" | "show";
+  topic?: string;
 };
 
 type SpotifyConnection = {
@@ -81,28 +86,63 @@ function DashboardContent() {
   const [spotifyLoading, setSpotifyLoading] = useState(false);
   const [spotifyMessage, setSpotifyMessage] = useState<string | null>(null);
   const [spotifyConnection, setSpotifyConnection] = useState<SpotifyConnection | null>(null);
+  const [episodeDrawerShow, setEpisodeDrawerShow] = useState<SpotifyPodcast | null>(null);
+  const [showEpisodes, setShowEpisodes] = useState<SpotifyPodcast[]>([]);
+  const [showEpisodesLoading, setShowEpisodesLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<SectionId>("courses");
   const spotifyRows = useMemo(
-    () =>
-      [
-        {
-          title: "Episodes To Play Now",
-          subtitle: "Tap one and it opens in the player.",
-          items: spotifyPodcasts.filter((item) => item.kind === "episode"),
-        },
-        {
-          title: "Study Playlists",
-          subtitle: "Longer audio for coding, reading, and focus sessions.",
-          items: spotifyPodcasts.filter((item) => item.kind === "playlist"),
-        },
-        {
-          title: "Podcast Shows",
-          subtitle: "Open a full show and explore its episodes in the Spotify embed.",
-          items: spotifyPodcasts.filter((item) => item.kind === "show"),
-        },
-      ].filter((row) => row.items.length > 0),
-    [spotifyPodcasts]
+    () => {
+      const topicsToShow = spotifyCategory === "All" ? courseCategories : [spotifyCategory];
+
+      return topicsToShow
+        .map((topic) => ({
+          title: `${topic} Audio`,
+          subtitle: "English episodes, playlists, and shows for this topic.",
+          items: spotifyPodcasts.filter((item) => item.topic === topic),
+        }))
+        .filter((row) => row.items.length > 0);
+    },
+    [spotifyCategory, spotifyPodcasts]
   );
+  const selectedAudioIndex = selectedSpotifyPodcast
+    ? spotifyPodcasts.findIndex((item) => item.id === selectedSpotifyPodcast.id)
+    : -1;
+  const selectNextSpotifyItem = () => {
+    if (!spotifyPodcasts.length) return;
+    const nextIndex =
+      selectedAudioIndex >= 0 ? (selectedAudioIndex + 1) % spotifyPodcasts.length : 0;
+    setSelectedSpotifyPodcast(spotifyPodcasts[nextIndex]);
+  };
+  const selectPreviousSpotifyItem = () => {
+    if (!spotifyPodcasts.length) return;
+    const previousIndex =
+      selectedAudioIndex > 0 ? selectedAudioIndex - 1 : spotifyPodcasts.length - 1;
+    setSelectedSpotifyPodcast(spotifyPodcasts[previousIndex]);
+  };
+  const openShowEpisodes = (show: SpotifyPodcast) => {
+    const showId = show.id.replace(/^show-/, "");
+    setEpisodeDrawerShow(show);
+    setShowEpisodes([]);
+    setShowEpisodesLoading(true);
+
+    fetch(`/api/spotify/show-episodes?showId=${encodeURIComponent(showId)}`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data: { episodes?: SpotifyPodcast[] }) =>
+        setShowEpisodes(data.episodes ?? [])
+      )
+      .catch(() => setShowEpisodes([]))
+      .finally(() => setShowEpisodesLoading(false));
+  };
+  const handleSpotifyCardClick = (item: SpotifyPodcast) => {
+    if (item.kind === "show") {
+      openShowEpisodes(item);
+      return;
+    }
+
+    setSelectedSpotifyPodcast(item);
+  };
 
   useEffect(() => {
     if (activeSection !== "spotify") return;
@@ -233,20 +273,47 @@ function DashboardContent() {
             </nav>
 
             <div className="flex items-center justify-between gap-2 lg:justify-end">
-              {activeSection === "spotify" && selectedSpotifyPodcast && (
-                <div className="hidden max-w-64 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-left text-xs text-[#f6f1e8] lg:flex">
-                  <span
-                    className="size-8 shrink-0 rounded-full bg-[#141416] bg-cover bg-center"
-                    style={
-                      selectedSpotifyPodcast.imageUrl
-                        ? { backgroundImage: `url(${selectedSpotifyPodcast.imageUrl})` }
-                        : undefined
+              {activeSection === "spotify" && spotifyConnection?.connected && (
+                <div className="hidden max-w-80 items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-[#f6f1e8] lg:flex">
+                  <button
+                    type="button"
+                    onClick={selectPreviousSpotifyItem}
+                    className="rounded-full p-2 transition-colors hover:bg-white/10"
+                    aria-label="Previous Spotify item"
+                  >
+                    <SkipBack className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      selectedSpotifyPodcast
+                        ? setSelectedSpotifyPodcast(selectedSpotifyPodcast)
+                        : selectNextSpotifyItem()
                     }
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{selectedSpotifyPodcast.title}</p>
-                    <p className="truncate text-[#d6d0c6]/55">Selected audio</p>
-                  </div>
+                    className="rounded-full bg-[#b11226] p-2 text-white transition-colors hover:bg-[#8f0e1f]"
+                    aria-label="Load selected Spotify item"
+                  >
+                    <PlayCircle className="size-3.5 fill-current" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSpotifyPodcast(null)}
+                    className="rounded-full p-2 transition-colors hover:bg-white/10"
+                    aria-label="Stop selected Spotify item"
+                  >
+                    <Square className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectNextSpotifyItem}
+                    className="rounded-full p-2 transition-colors hover:bg-white/10"
+                    aria-label="Next Spotify item"
+                  >
+                    <SkipForward className="size-3.5" />
+                  </button>
+                  <p className="ml-1 max-w-36 truncate text-[#d6d0c6]/65">
+                    {selectedSpotifyPodcast?.title ?? "Choose audio"}
+                  </p>
                 </div>
               )}
               <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -485,7 +552,7 @@ function DashboardContent() {
                               <button
                                 key={podcast.id}
                                 type="button"
-                                onClick={() => setSelectedSpotifyPodcast(podcast)}
+                                onClick={() => handleSpotifyCardClick(podcast)}
                                 className={cn(
                                   "group min-w-64 max-w-64 overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
                                   selected
@@ -505,8 +572,8 @@ function DashboardContent() {
                                     <Badge className="bg-black/70 text-white hover:bg-black/70">
                                       {podcast.kind ?? "audio"}
                                     </Badge>
-                                    <span className="rounded-full bg-[#b11226] p-2 text-white opacity-90 transition-transform group-hover:scale-105">
-                                      <PlayCircle className="size-4 fill-current" />
+                                    <span className="rounded-full bg-[#b11226] px-3 py-2 text-xs font-bold text-white opacity-90 transition-transform group-hover:scale-105">
+                                      {podcast.kind === "show" ? "Episodes" : <PlayCircle className="size-4 fill-current" />}
                                     </span>
                                   </div>
                                 </div>
@@ -550,6 +617,73 @@ function DashboardContent() {
           </div>
         </main>
       </div>
+      {episodeDrawerShow && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-md">
+          <div className="max-h-[86vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#08080a] text-[#f6f1e8] shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.2em] text-[#d6d0c6]/50">
+                  Episodes
+                </p>
+                <h3 className="mt-1 line-clamp-2 text-2xl font-black">
+                  {episodeDrawerShow.title}
+                </h3>
+                <p className="mt-1 line-clamp-1 text-sm text-[#d6d0c6]/60">
+                  {episodeDrawerShow.publisher}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEpisodeDrawerShow(null)}
+                className="rounded-full border border-white/10 p-2 transition-colors hover:bg-white/10"
+                aria-label="Close episodes"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="max-h-[62vh] overflow-y-auto p-4">
+              {showEpisodesLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((item) => (
+                    <div key={item} className="h-20 animate-pulse rounded-2xl bg-white/10" />
+                  ))}
+                </div>
+              ) : showEpisodes.length ? (
+                <div className="space-y-3">
+                  {showEpisodes.map((episode, index) => (
+                    <button
+                      key={episode.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSpotifyPodcast(episode);
+                        setEpisodeDrawerShow(null);
+                      }}
+                      className="flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.07]"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#b11226]/20 text-sm font-bold text-[#f6f1e8]">
+                        {index + 1}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm font-bold">{episode.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-[#d6d0c6]/60">
+                          {episode.description}
+                        </p>
+                        <p className="mt-2 text-xs text-blue-200">
+                          {episode.episodeCount} min · play in Virtual Lab
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-white/15 p-6 text-center text-sm text-[#d6d0c6]/65">
+                  No episodes loaded for this show. Try another show.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
