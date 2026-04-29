@@ -76,16 +76,31 @@ type SpotifySearchResponse = {
   };
 };
 
+type SpotifyRecommendation = {
+  id: string;
+  title: string;
+  publisher: string;
+  description: string;
+  episodeCount: number;
+  imageUrl: string | null;
+  spotifyUrl: string;
+  embedUrl: string | null;
+  category: string;
+  kind: "episode" | "playlist" | "show";
+  topic: string;
+  score: number;
+};
+
 const EDUCATIONAL_QUERIES: Record<string, string> = {
-  All: "US English education technology university learning programming podcast",
-  Java: "US English Java programming software engineering podcast",
-  Python: "US English python programming education podcast",
-  "Web Development": "US English web development javascript react education podcast",
-  "Data Science": "US English data science machine learning education podcast",
-  Cybersecurity: "US English cybersecurity ethical hacking education podcast",
-  AI: "US English artificial intelligence machine learning education podcast",
-  Cloud: "US English cloud computing AWS Azure DevOps podcast",
-  Career: "US English software engineering career interview podcast",
+  All: "top English technology education programming software engineering podcast course",
+  Java: "top Java programming software engineering course podcast",
+  Python: "best Python programming data science course podcast",
+  "Web Development": "best web development JavaScript React software engineering podcast",
+  "Data Science": "best data science machine learning Python podcast",
+  Cybersecurity: "best cybersecurity ethical hacking information security podcast",
+  AI: "best artificial intelligence machine learning technology podcast",
+  Cloud: "best cloud computing AWS Azure DevOps engineering podcast",
+  Career: "best software engineering career interview technology podcast",
 };
 
 const FEATURED_TOPICS = [
@@ -108,6 +123,17 @@ const NON_US_RESULT_TERMS = [
   "desi",
 ];
 
+const LOW_QUALITY_TERMS = [
+  "trailer",
+  "preview",
+  "teaser",
+  "sleep",
+  "asmr",
+  "music only",
+  "lofi",
+  "kids",
+];
+
 function isUSFocusedResult(input: {
   title: string;
   publisher: string;
@@ -115,6 +141,60 @@ function isUSFocusedResult(input: {
 }) {
   const searchable = `${input.title} ${input.publisher} ${input.description}`.toLowerCase();
   return !NON_US_RESULT_TERMS.some((term) => searchable.includes(term));
+}
+
+function isUsefulEducationalResult(input: {
+  title: string;
+  publisher: string;
+  description: string;
+  imageUrl: string | null;
+  episodeCount: number;
+  kind: "episode" | "playlist" | "show";
+}) {
+  const searchable = `${input.title} ${input.publisher} ${input.description}`.toLowerCase();
+  if (!input.imageUrl) return false;
+  if (!input.title.trim() || !input.description.trim()) return false;
+  if (LOW_QUALITY_TERMS.some((term) => searchable.includes(term))) return false;
+
+  if (input.kind === "episode") return input.episodeCount >= 5;
+  if (input.kind === "playlist") return input.episodeCount >= 10;
+  return input.episodeCount >= 5;
+}
+
+function scoreRecommendation(item: {
+  title: string;
+  publisher: string;
+  description: string;
+  imageUrl: string | null;
+  episodeCount: number;
+  kind: "episode" | "playlist" | "show";
+}) {
+  const searchable = `${item.title} ${item.publisher} ${item.description}`.toLowerCase();
+  let score = 0;
+
+  if (item.imageUrl) score += 20;
+  if (item.kind === "episode") score += 35;
+  if (item.kind === "playlist") score += 25;
+  if (item.kind === "show") score += 15;
+  score += Math.min(item.episodeCount, item.kind === "playlist" ? 80 : 60);
+  if (searchable.includes("course")) score += 18;
+  if (searchable.includes("programming")) score += 15;
+  if (searchable.includes("software")) score += 12;
+  if (searchable.includes("engineer")) score += 12;
+  if (searchable.includes("education") || searchable.includes("learn")) score += 10;
+  if (searchable.includes("top") || searchable.includes("best")) score += 8;
+
+  return score;
+}
+
+function uniqueRecommendations(items: SpotifyRecommendation[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = `${item.kind}:${item.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function parseSpotifyCookie(request: NextRequest) {
@@ -213,7 +293,7 @@ export async function GET(request: NextRequest) {
           q: EDUCATIONAL_QUERIES[topic],
       type: "episode,playlist,show",
       market: "US",
-          limit: category === "All" ? "4" : "8",
+          limit: category === "All" ? "6" : "12",
     });
 
     const searchRes = await fetch(
@@ -234,63 +314,91 @@ export async function GET(request: NextRequest) {
     const episodes =
       searchData.episodes?.items
         ?.filter((episode): episode is SpotifyEpisode => Boolean(episode))
-        .map((episode) => ({
-          id: `episode-${episode.id}`,
-          title: episode.name,
-          publisher: episode.show?.name ?? episode.show?.publisher ?? "Spotify episode",
-          description: episode.description,
-          episodeCount: episode.duration_ms
-            ? Math.max(1, Math.round(episode.duration_ms / 60000))
-            : 1,
-          imageUrl: episode.images?.[0]?.url ?? episode.show?.images?.[0]?.url ?? null,
-          spotifyUrl:
-            episode.external_urls?.spotify ?? `https://open.spotify.com/episode/${episode.id}`,
-          embedUrl: `https://open.spotify.com/embed/episode/${episode.id}?utm_source=generator&theme=0`,
-              category: `${topic} episode`,
-          kind: "episode",
-              topic,
-        }))
-        .filter(isUSFocusedResult) ?? [];
+        .map((episode) => {
+          const item = {
+            id: `episode-${episode.id}`,
+            title: episode.name,
+            publisher: episode.show?.name ?? episode.show?.publisher ?? "Spotify episode",
+            description: episode.description,
+            episodeCount: episode.duration_ms
+              ? Math.max(1, Math.round(episode.duration_ms / 60000))
+              : 0,
+            imageUrl: episode.images?.[0]?.url ?? episode.show?.images?.[0]?.url ?? null,
+            spotifyUrl:
+              episode.external_urls?.spotify ?? `https://open.spotify.com/episode/${episode.id}`,
+            embedUrl: `https://open.spotify.com/embed/episode/${episode.id}?utm_source=generator&theme=0`,
+            category: `${topic} episode`,
+            kind: "episode" as const,
+            topic,
+          };
+
+          return {
+            ...item,
+            score: scoreRecommendation(item),
+          };
+        })
+        .filter(isUSFocusedResult)
+        .filter(isUsefulEducationalResult) ?? [];
 
     const shows =
       searchData.shows?.items
         ?.filter((show): show is SpotifyShow => Boolean(show))
-        .map((show) => ({
-          id: `show-${show.id}`,
-          title: show.name,
-          publisher: show.publisher,
-          description: show.description,
-          episodeCount: show.total_episodes,
-          imageUrl: show.images?.[0]?.url ?? null,
-          spotifyUrl: show.external_urls?.spotify ?? `https://open.spotify.com/show/${show.id}`,
-          embedUrl: `https://open.spotify.com/embed/show/${show.id}?utm_source=generator&theme=0`,
-              category: `${topic} show`,
-          kind: "show",
-              topic,
-        }))
-        .filter(isUSFocusedResult) ?? [];
+        .map((show) => {
+          const item = {
+            id: `show-${show.id}`,
+            title: show.name,
+            publisher: show.publisher,
+            description: show.description,
+            episodeCount: show.total_episodes,
+            imageUrl: show.images?.[0]?.url ?? null,
+            spotifyUrl: show.external_urls?.spotify ?? `https://open.spotify.com/show/${show.id}`,
+            embedUrl: `https://open.spotify.com/embed/show/${show.id}?utm_source=generator&theme=0`,
+            category: `${topic} show`,
+            kind: "show" as const,
+            topic,
+          };
+
+          return {
+            ...item,
+            score: scoreRecommendation(item),
+          };
+        })
+        .filter(isUSFocusedResult)
+        .filter(isUsefulEducationalResult) ?? [];
     const playlists =
       searchData.playlists?.items
         ?.filter((playlist): playlist is SpotifyPlaylist => Boolean(playlist))
-        .map((playlist) => ({
-          id: `playlist-${playlist.id}`,
-          title: playlist.name,
-          publisher: playlist.owner?.display_name ?? "Spotify playlist",
-          description: playlist.description,
-          episodeCount: playlist.tracks?.total ?? 0,
-          imageUrl: playlist.images?.[0]?.url ?? null,
-          spotifyUrl:
-            playlist.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlist.id}`,
-          embedUrl: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
-              category: `${topic} playlist`,
-          kind: "playlist",
-              topic,
-        }))
-        .filter(isUSFocusedResult) ?? [];
-        return [...episodes, ...playlists, ...shows];
+        .map((playlist) => {
+          const item = {
+            id: `playlist-${playlist.id}`,
+            title: playlist.name,
+            publisher: playlist.owner?.display_name ?? "Spotify playlist",
+            description: playlist.description,
+            episodeCount: playlist.tracks?.total ?? 0,
+            imageUrl: playlist.images?.[0]?.url ?? null,
+            spotifyUrl:
+              playlist.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlist.id}`,
+            embedUrl: `https://open.spotify.com/embed/playlist/${playlist.id}?utm_source=generator&theme=0`,
+            category: `${topic} playlist`,
+            kind: "playlist" as const,
+            topic,
+          };
+
+          return {
+            ...item,
+            score: scoreRecommendation(item),
+          };
+        })
+        .filter(isUSFocusedResult)
+        .filter(isUsefulEducationalResult) ?? [];
+        return [...episodes, ...playlists, ...shows]
+          .sort((first, second) => second.score - first.score)
+          .slice(0, category === "All" ? 4 : 8);
       })
     );
-    const podcasts = results.flat();
+    const podcasts = uniqueRecommendations(results.flat())
+      .sort((first, second) => second.score - first.score)
+      .map(({ score: _score, ...podcast }) => podcast);
 
     return withRefreshedCookie({
       connected: true,

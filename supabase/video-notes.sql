@@ -5,12 +5,16 @@ create table if not exists public.learning_video_notes (
   user_id text not null,
   video_id text not null,
   video_title text not null,
+  note_title text not null default 'Untitled note',
   topic text not null default 'All',
   content text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, video_id)
 );
+
+alter table public.learning_video_notes
+  add column if not exists note_title text not null default 'Untitled note';
 
 create index if not exists idx_learning_video_notes_user_updated
   on public.learning_video_notes(user_id, updated_at desc);

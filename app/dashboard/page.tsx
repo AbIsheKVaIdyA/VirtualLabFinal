@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenText,
   CheckSquare,
@@ -14,7 +14,6 @@ import {
   Link2,
   ListMusic,
   NotebookPen,
-  PauseCircle,
   PlayCircle,
   Podcast,
   Save,
@@ -133,6 +132,7 @@ type LearningVideo = {
 type SavedVideoNote = {
   videoId: string;
   videoTitle: string;
+  noteTitle?: string;
   topic: string;
   content: string;
   updatedAt: string;
@@ -165,6 +165,28 @@ const navSections: Array<{ id: SectionId; label: string; icon: React.ComponentTy
   { id: "community", label: "Community", icon: Disc3 },
 ];
 
+const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
+  title,
+  embedUrl,
+}: {
+  title: string;
+  embedUrl: string;
+}) {
+  return (
+    <div className="h-20 w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[#08080a] shadow-lg shadow-black/25">
+      <iframe
+        title={`Spotify navbar player for ${title}`}
+        src={embedUrl}
+        width="100%"
+        height="80"
+        allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        className="border-0"
+      />
+    </div>
+  );
+});
+
 function DashboardContent() {
   const { user: clerkUser } = useUser();
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -180,7 +202,6 @@ function DashboardContent() {
   const [audioDrawerItems, setAudioDrawerItems] = useState<SpotifyPodcast[]>([]);
   const [audioDrawerLoading, setAudioDrawerLoading] = useState(false);
   const [lastSpotifyPodcast, setLastSpotifyPodcast] = useState<SpotifyPodcast | null>(null);
-  const [spotifyPlayerPaused, setSpotifyPlayerPaused] = useState(false);
   const [videoTopic, setVideoTopic] = useState("All");
   const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
@@ -190,6 +211,7 @@ function DashboardContent() {
   const [noteStatus, setNoteStatus] = useState<string | null>(null);
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
   const [noteSearch, setNoteSearch] = useState("");
+  const [noteTitleDrafts, setNoteTitleDrafts] = useState<Record<string, string>>({});
   const [savedVideoNotes, setSavedVideoNotes] = useState<SavedVideoNote[]>([]);
   const [noteHistory, setNoteHistory] = useState<NoteHistoryEntry[]>([]);
   const [studyStartedAt, setStudyStartedAt] = useState<number | null>(null);
@@ -207,7 +229,9 @@ function DashboardContent() {
     if (!query) return savedVideoNotes;
 
     return savedVideoNotes.filter((note) =>
-      `${note.videoTitle} ${note.topic} ${note.content}`.toLowerCase().includes(query)
+      `${note.noteTitle ?? ""} ${note.videoTitle} ${note.topic} ${note.content}`
+        .toLowerCase()
+        .includes(query)
     );
   }, [noteSearch, savedVideoNotes]);
   const spotifyRows = useMemo(
@@ -241,7 +265,6 @@ function DashboardContent() {
     if (!item) return;
 
     setLastSpotifyPodcast(item);
-    setSpotifyPlayerPaused(false);
     window.localStorage.setItem(SPOTIFY_LAST_AUDIO_KEY, JSON.stringify(item));
   };
   const selectNextSpotifyItem = () => {
@@ -255,19 +278,6 @@ function DashboardContent() {
     const previousIndex =
       selectedAudioIndex > 0 ? selectedAudioIndex - 1 : spotifyPodcasts.length - 1;
     selectSpotifyAudio(spotifyPodcasts[previousIndex]);
-  };
-  const toggleSpotifyPlayback = () => {
-    if (selectedSpotifyPodcast) {
-      setSpotifyPlayerPaused((current) => !current);
-      return;
-    }
-
-    if (lastSpotifyPodcast) {
-      selectSpotifyAudio(lastSpotifyPodcast);
-      return;
-    }
-
-    selectNextSpotifyItem();
   };
   const readRecentLearningVideos = () => {
     try {
@@ -363,7 +373,11 @@ function DashboardContent() {
   };
 
   const refreshLocalNoteIndex = () => {
-    setSavedVideoNotes(readLocalNoteIndex());
+    const notes = readLocalNoteIndex();
+    setSavedVideoNotes(notes);
+    setNoteTitleDrafts(
+      Object.fromEntries(notes.map((note) => [note.videoId, note.noteTitle ?? note.videoTitle]))
+    );
   };
 
   const saveLocalNote = (content: string) => {
@@ -375,6 +389,9 @@ function DashboardContent() {
       {
         videoId: selectedVideo.id,
         videoTitle: selectedVideo.title,
+        noteTitle:
+          readLocalNoteIndex().find((note) => note.videoId === selectedVideo.id)?.noteTitle ??
+          selectedVideo.title,
         topic: selectedVideo.topic,
         content,
         updatedAt,
@@ -384,6 +401,54 @@ function DashboardContent() {
 
     window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(nextIndex));
     setSavedVideoNotes(nextIndex);
+    setNoteTitleDrafts((current) => ({
+      ...current,
+      [selectedVideo.id]: nextIndex[0].noteTitle ?? selectedVideo.title,
+    }));
+  };
+
+  const renameSavedNote = (videoId: string, nextTitle: string) => {
+    const cleanTitle = nextTitle.trim();
+    if (!cleanTitle) return;
+
+    const nextIndex = readLocalNoteIndex().map((note) =>
+      note.videoId === videoId
+        ? { ...note, noteTitle: cleanTitle, updatedAt: new Date().toISOString() }
+        : note
+    );
+    window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(nextIndex));
+    setSavedVideoNotes(nextIndex);
+    setNoteTitleDrafts((current) => ({ ...current, [videoId]: cleanTitle }));
+
+    fetch("/api/video-notes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId, noteTitle: cleanTitle }),
+    }).catch(() => undefined);
+  };
+
+  const deleteSavedNote = (note: SavedVideoNote) => {
+    const nextIndex = readLocalNoteIndex().filter((item) => item.videoId !== note.videoId);
+    window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(nextIndex));
+    window.localStorage.removeItem(`${VIDEO_NOTE_KEY_PREFIX}${clerkUser?.id ?? "guest"}:${note.videoId}`);
+    window.localStorage.removeItem(
+      `${VIDEO_NOTE_HISTORY_KEY_PREFIX}${clerkUser?.id ?? "guest"}:${note.videoId}`
+    );
+    setSavedVideoNotes(nextIndex);
+    setNoteTitleDrafts((current) => {
+      const { [note.videoId]: _deleted, ...rest } = current;
+      return rest;
+    });
+
+    if (selectedVideo?.id === note.videoId) {
+      setVideoNote("");
+      setNoteHistory([]);
+      setNoteStatus("Note deleted.");
+    }
+
+    fetch(`/api/video-notes?videoId=${encodeURIComponent(note.videoId)}`, {
+      method: "DELETE",
+    }).catch(() => undefined);
   };
 
   const readLocalHistory = () => {
@@ -472,6 +537,9 @@ function DashboardContent() {
       body: JSON.stringify({
         videoId: selectedVideo.id,
         videoTitle: selectedVideo.title,
+        noteTitle:
+          readLocalNoteIndex().find((note) => note.videoId === selectedVideo.id)?.noteTitle ??
+          selectedVideo.title,
         topic: selectedVideo.topic,
         content: videoNote,
         createSnapshot: true,
@@ -482,7 +550,10 @@ function DashboardContent() {
   const exportNoteMarkdown = () => {
     if (!selectedVideo) return;
 
-    const markdown = `# ${selectedVideo.title}\n\nTopic: ${selectedVideo.topic}\nChannel: ${selectedVideo.channelTitle}\n\n${videoNote}`;
+    const noteTitle =
+      readLocalNoteIndex().find((note) => note.videoId === selectedVideo.id)?.noteTitle ??
+      selectedVideo.title;
+    const markdown = `# ${noteTitle}\n\nVideo: ${selectedVideo.title}\nTopic: ${selectedVideo.topic}\nChannel: ${selectedVideo.channelTitle}\n\n${videoNote}`;
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -536,7 +607,7 @@ function DashboardContent() {
         setSelectedVideo((current) =>
           current && videos.some((video) => video.id === current.id)
             ? current
-            : videos[0] ?? null
+            : null
         );
         setVideosMessage(data.message ?? "YouTube course videos loaded.");
       })
@@ -619,6 +690,11 @@ function DashboardContent() {
         ];
         window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(merged));
         setSavedVideoNotes(merged);
+        setNoteTitleDrafts(
+          Object.fromEntries(
+            merged.map((note) => [note.videoId, note.noteTitle ?? note.videoTitle])
+          )
+        );
       })
       .catch(() => undefined);
   }, []);
@@ -638,6 +714,9 @@ function DashboardContent() {
         body: JSON.stringify({
           videoId: selectedVideo.id,
           videoTitle: selectedVideo.title,
+          noteTitle:
+            readLocalNoteIndex().find((note) => note.videoId === selectedVideo.id)?.noteTitle ??
+            selectedVideo.title,
           topic: selectedVideo.topic,
           content: videoNote,
         }),
@@ -730,7 +809,6 @@ function DashboardContent() {
     <div
       className={cn(
         "relative min-h-screen overflow-x-hidden transition-colors duration-700",
-        selectedSpotifyPodcast?.embedUrl && !spotifyPlayerPaused && "pb-28",
         activeSection === "spotify" && "bg-[#050505] text-white"
       )}
     >
@@ -786,53 +864,37 @@ function DashboardContent() {
 
             <div className="flex items-center justify-between gap-2 lg:justify-end">
               {(selectedSpotifyPodcast || lastSpotifyPodcast || spotifyConnection?.connected) && (
-                <div className="hidden max-w-[28rem] items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-[#f6f1e8] lg:flex">
-                  <span
-                    className="size-9 shrink-0 rounded-full border border-white/10 bg-[#141416] bg-cover bg-center"
-                    style={
-                      (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
-                        ? {
-                            backgroundImage: `url(${
-                              (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
-                            })`,
-                          }
-                        : undefined
-                    }
-                    aria-hidden="true"
-                  />
+                <div className="hidden items-center gap-2 text-xs text-[#f6f1e8] lg:flex">
                   <button
                     type="button"
                     onClick={selectPreviousSpotifyItem}
-                    className="rounded-full p-2 transition-colors hover:bg-white/10"
+                    className="rounded-full border border-white/10 bg-white/[0.04] p-2 transition-colors hover:bg-white/10"
                     aria-label="Previous Spotify item"
                   >
                     <SkipBack className="size-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={toggleSpotifyPlayback}
-                    className="rounded-full bg-[#b11226] p-2 text-white transition-colors hover:bg-[#8f0e1f]"
-                    aria-label={spotifyPlayerPaused ? "Play Spotify item" : "Pause Spotify item"}
-                  >
-                    {spotifyPlayerPaused ? (
-                      <PlayCircle className="size-3.5 fill-current" />
-                    ) : (
-                      <PauseCircle className="size-3.5 fill-current" />
-                    )}
-                  </button>
+                  {selectedSpotifyPodcast?.embedUrl ? (
+                    <SpotifyNavbarPlayer
+                      title={selectedSpotifyPodcast.title}
+                      embedUrl={selectedSpotifyPodcast.embedUrl}
+                    />
+                  ) : lastSpotifyPodcast ? (
+                    <button
+                      type="button"
+                      onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
+                      className="max-w-72 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-left text-xs font-semibold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                    >
+                      Continue {lastSpotifyPodcast.title}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={selectNextSpotifyItem}
-                    className="rounded-full p-2 transition-colors hover:bg-white/10"
+                    className="rounded-full border border-white/10 bg-white/[0.04] p-2 transition-colors hover:bg-white/10"
                     aria-label="Next Spotify item"
                   >
                     <SkipForward className="size-3.5" />
                   </button>
-                  <p className="ml-1 max-w-40 truncate text-[#d6d0c6]/70">
-                    {selectedSpotifyPodcast?.title ??
-                      lastSpotifyPodcast?.title ??
-                      "Choose audio"}
-                  </p>
                 </div>
               )}
               <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -1339,13 +1401,34 @@ function DashboardContent() {
                               className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
                             >
                               <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="line-clamp-2 text-base font-bold text-[#f6f1e8]">
-                                    {note.videoTitle}
-                                  </p>
+                                <div className="min-w-0 flex-1">
+                                  <input
+                                    value={
+                                      noteTitleDrafts[note.videoId] ??
+                                      note.noteTitle ??
+                                      note.videoTitle
+                                    }
+                                    onChange={(event) =>
+                                      setNoteTitleDrafts((current) => ({
+                                        ...current,
+                                        [note.videoId]: event.target.value,
+                                      }))
+                                    }
+                                    onBlur={(event) =>
+                                      renameSavedNote(note.videoId, event.target.value)
+                                    }
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.currentTarget.blur();
+                                      }
+                                    }}
+                                    className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60"
+                                    aria-label="Rename note"
+                                  />
                                   <p className="mt-1 text-xs text-blue-200">
-                                    Made with: {note.topic}
+                                    Video: {note.videoTitle}
                                   </p>
+                                  <p className="mt-1 text-xs text-blue-200">Topic: {note.topic}</p>
                                   <p className="mt-1 text-xs text-[#d6d0c6]/45">
                                     Updated {new Date(note.updatedAt).toLocaleString()}
                                   </p>
@@ -1382,6 +1465,13 @@ function DashboardContent() {
                                     Video not in recent list
                                   </span>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => deleteSavedNote(note)}
+                                  className="rounded-full border border-red-400/25 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-100 transition-colors hover:bg-red-500/20"
+                                >
+                                  Delete
+                                </button>
                               </div>
                             </div>
                           );
@@ -1459,87 +1549,65 @@ function DashboardContent() {
                   </section>
                 ) : (
                   <>
-                <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,#171719_0%,#080809_44%,#36080c_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
-                  <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] xl:gap-6">
-                    <div className="space-y-5">
+                <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_0%_0%,rgba(177,18,38,0.22),transparent_32%),linear-gradient(135deg,#171719_0%,#080809_48%,#130305_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
+                  <div className="space-y-5">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
                         <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
-                          Play study audio inside UpSkillr.
+                          Study audio for every session.
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
-                          Pick a topic and start a Spotify episode or show from
-                          the embedded player without leaving your study flow.
+                          Pick a topic, choose an episode or playlist, and control playback from the navbar.
                         </p>
                       </div>
-                      <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-                        {["All", ...courseCategories].map((category) => (
-                          <button
-                            key={`spotify-${category}`}
-                            type="button"
-                            onClick={() => setSpotifyCategory(category)}
-                            className={cn(
-                              "shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition-all",
-                              spotifyCategory === category
-                                ? "border-[#b11226] bg-[#b11226] text-white"
-                                : "border-white/15 bg-black/40 text-[#d6d0c6] hover:border-[#b11226]/50 hover:bg-white/5"
-                            )}
-                          >
-                            {category}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="rounded-full border border-green-400/30 bg-green-500/10 px-4 py-2 text-xs font-semibold text-green-100">
+                      <div className="rounded-2xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-xs font-semibold text-green-100">
                         Connected as {spotifyConnection.profile?.name ?? "Spotify user"}
                         {spotifyConnection.profile?.product
                           ? ` · ${spotifyConnection.profile.product}`
                           : ""}
                       </div>
                     </div>
-
-                    <Card className="border-white/10 bg-[#0b0b0d]/90 text-[#f6f1e8] shadow-xl shadow-black/40">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
-                          <PlayCircle className="size-5 text-[#b11226]" />
-                          Player
-                        </CardTitle>
-                        <p className="text-sm text-[#d6d0c6]/60">
-                          {selectedSpotifyPodcast
-                            ? selectedSpotifyPodcast.title
-                            : lastSpotifyPodcast
-                              ? `Continue: ${lastSpotifyPodcast.title}`
-                            : "Choose an episode, playlist, or show below."}
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
-                            <div className="space-y-3">
-                              <p className="font-semibold text-[#f6f1e8]">
-                                {selectedSpotifyPodcast
-                                  ? "Spotify is playing from the global player."
-                                  : lastSpotifyPodcast
-                                    ? "Continue your last Spotify item."
-                                  : "Choose something to play."}
-                              </p>
-                              <p className="mt-2">
-                                {selectedSpotifyPodcast
-                                  ? "Use the navbar control from any section. The player stays mounted while you move around."
-                                  : lastSpotifyPodcast
-                                    ? "This reopens the same Spotify embed you were using."
-                                  : "Spotify recommendations are loading below."}
-                              </p>
-                              {!selectedSpotifyPodcast && lastSpotifyPodcast && (
-                                <button
-                                  type="button"
-                                  onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
-                                  className="rounded-full bg-[#b11226] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f]"
-                                >
-                                  Continue listening
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                      </CardContent>
-                    </Card>
+                    <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                      {["All", ...courseCategories].map((category) => (
+                        <button
+                          key={`spotify-${category}`}
+                          type="button"
+                          onClick={() => setSpotifyCategory(category)}
+                          className={cn(
+                            "shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition-all",
+                            spotifyCategory === category
+                              ? "border-[#b11226] bg-[#b11226] text-white"
+                              : "border-white/15 bg-black/40 text-[#d6d0c6] hover:border-[#b11226]/50 hover:bg-white/5"
+                          )}
+                        >
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+                    {(selectedSpotifyPodcast || lastSpotifyPodcast) && (
+                      <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3">
+                        <div
+                          className="size-14 shrink-0 rounded-xl bg-[#141416] bg-cover bg-center"
+                          style={
+                            (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
+                              ? {
+                                  backgroundImage: `url(${
+                                    (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
+                                  })`,
+                                }
+                              : undefined
+                          }
+                        />
+                        <div className="min-w-0">
+                          <p className="line-clamp-1 text-sm font-bold text-[#f6f1e8]">
+                            {selectedSpotifyPodcast?.title ?? lastSpotifyPodcast?.title}
+                          </p>
+                          <p className="line-clamp-1 text-xs text-[#d6d0c6]/55">
+                            {selectedSpotifyPodcast ? "Playing in navbar" : "Ready to continue"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -1776,19 +1844,6 @@ function DashboardContent() {
               )}
             </div>
           </div>
-        </div>
-      )}
-      {selectedSpotifyPodcast?.embedUrl && !spotifyPlayerPaused && (
-        <div className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#08080a]/95 p-2 shadow-2xl shadow-black/60 backdrop-blur">
-          <iframe
-            title={`Spotify global player for ${selectedSpotifyPodcast.title}`}
-            src={selectedSpotifyPodcast.embedUrl}
-            width="100%"
-            height="88"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
-            className="rounded-xl border-0"
-          />
         </div>
       )}
     </div>

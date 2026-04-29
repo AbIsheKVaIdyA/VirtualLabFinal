@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 type NoteRow = {
   video_id?: string;
   video_title?: string;
+  note_title?: string;
   topic?: string;
   content: string;
   updated_at?: string;
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (!videoId) {
     const { data, error } = await supabaseAdmin
       .from("learning_video_notes")
-      .select("video_id, video_title, topic, content, updated_at")
+      .select("video_id, video_title, note_title, topic, content, updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false })
       .limit(20)
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
         data?.map((note) => ({
           videoId: note.video_id ?? "",
           videoTitle: note.video_title ?? "YouTube course video",
+          noteTitle: note.note_title ?? note.video_title ?? "YouTube course video",
           topic: note.topic ?? "All",
           content: note.content,
           updatedAt: note.updated_at ?? new Date().toISOString(),
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json()) as {
     videoId?: string;
     videoTitle?: string;
+    noteTitle?: string;
     topic?: string;
     content?: string;
     createSnapshot?: boolean;
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       video_id: body.videoId,
       video_title: body.videoTitle ?? "YouTube course video",
+      note_title: body.noteTitle ?? body.videoTitle ?? "YouTube course video",
       topic: body.topic ?? "All",
       content: body.content ?? "",
       updated_at: new Date().toISOString(),
@@ -133,4 +137,63 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ saved: !error, persisted: !error });
+}
+
+export async function PATCH(request: NextRequest) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return NextResponse.json({ saved: false }, { status: 401 });
+  }
+
+  if (!supabaseAdmin) {
+    return NextResponse.json({ saved: false, persisted: false }, { status: 200 });
+  }
+
+  const body = (await request.json()) as {
+    videoId?: string;
+    noteTitle?: string;
+  };
+
+  if (!body.videoId || !body.noteTitle?.trim()) {
+    return NextResponse.json({ saved: false }, { status: 400 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("learning_video_notes")
+    .update({
+      note_title: body.noteTitle.trim(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("video_id", body.videoId);
+
+  return NextResponse.json({ saved: !error, persisted: !error });
+}
+
+export async function DELETE(request: NextRequest) {
+  const { userId } = await auth();
+  const videoId = request.nextUrl.searchParams.get("videoId");
+
+  if (!userId || !videoId) {
+    return NextResponse.json({ deleted: false }, { status: 400 });
+  }
+
+  if (!supabaseAdmin) {
+    return NextResponse.json({ deleted: false, persisted: false }, { status: 200 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("learning_video_notes")
+    .delete()
+    .eq("user_id", userId)
+    .eq("video_id", videoId);
+
+  await supabaseAdmin
+    .from("learning_video_note_versions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("video_id", videoId);
+
+  return NextResponse.json({ deleted: !error, persisted: !error });
 }
