@@ -65,7 +65,12 @@ export function CommunityWorkspace({
   const voiceChannels = seed.channels.filter((channel) => channel.type === "voice");
 
   return (
-    <section className={cn("flex min-h-[calc(100vh-7rem)] flex-col gap-3 overflow-hidden", className)}>
+    <section
+      className={cn(
+        "flex min-h-0 flex-1 flex-col gap-3 overflow-hidden",
+        className
+      )}
+    >
       <header className="overflow-hidden rounded-2xl border border-white/10 bg-[radial-gradient(circle_at_0%_0%,rgba(177,18,38,0.28),transparent_34%),linear-gradient(135deg,#121217_0%,#08080a_55%,#030304_100%)] px-4 py-4 text-[#f6f1e8] shadow-2xl shadow-black/40 sm:rounded-3xl sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -81,7 +86,13 @@ export function CommunityWorkspace({
               #{activeChannel.name}
             </Badge>
             {showBackLink && (
-              <Link href="/dashboard" className={cn(buttonVariants({ variant: "outline" }))}>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "w-full justify-center sm:inline-flex sm:w-auto"
+                )}
+              >
                 Back to Dashboard
               </Link>
             )}
@@ -104,8 +115,8 @@ export function CommunityWorkspace({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid min-h-[680px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#08080a_0%,#050506_100%)] shadow-2xl shadow-black/35 sm:min-h-[calc(100vh-18rem)] sm:rounded-3xl lg:grid-cols-[82px_290px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#08080a_0%,#050506_100%)] shadow-2xl shadow-black/35 sm:rounded-3xl md:min-h-[min(calc(100dvh-10rem),900px)] md:grid-cols-[80px_288px_minmax(0,1fr)] lg:grid-cols-[80px_290px_minmax(0,1fr)]">
           <ServerSidebar
             servers={seed.servers}
             activeServerId={activeServerId}

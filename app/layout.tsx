@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google";
 
@@ -27,6 +27,13 @@ export const metadata: Metadata = {
     "UpSkillr is a modern learning platform for universities with courses, progress tracking, badges, and community-first learning.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,7 +45,7 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} ${plusJakartaSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-dvh flex-col">
         <ClerkProvider>
           <ThemeProvider>
             {children}

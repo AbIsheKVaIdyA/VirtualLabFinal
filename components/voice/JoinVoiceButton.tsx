@@ -31,7 +31,7 @@ export function JoinVoiceButton({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid touch-manipulation grid-cols-3 gap-2 [&_button]:min-h-11">
       <Button variant="secondary" onClick={onToggleMute} aria-label="Toggle mute">
         {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
       </Button>

@@ -122,7 +122,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground font-normal;
+    @apply min-w-0 overflow-x-clip bg-background text-foreground font-normal;
+    /* Horizontal inset for curved / notched phones (combines with app padding) */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
     background-image:
       radial-gradient(circle at 10% -10%, color-mix(in oklab, var(--primary) 28%, transparent), transparent 34%),
       radial-gradient(circle at 90% 0%, color-mix(in oklab, var(--accent) 24%, transparent), transparent 34%),
@@ -130,6 +133,8 @@
   }
   html {
     @apply font-sans;
+    overflow-x: clip;
+    min-height: 100%;
   }
   h1,
   h2,

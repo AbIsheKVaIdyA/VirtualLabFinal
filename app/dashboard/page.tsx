@@ -165,6 +165,7 @@ const navSections: Array<{ id: SectionId; label: string; icon: React.ComponentTy
   { id: "community", label: "Community", icon: Disc3 },
 ];
 
+/** Responsive slim embed — shares a full-width strip below the nav so pills are not squeezed. */
 const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
   title,
   embedUrl,
@@ -173,15 +174,21 @@ const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
   embedUrl: string;
 }) {
   return (
-    <div className="h-20 w-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[#08080a] shadow-lg shadow-black/25">
+    <div
+      className={cn(
+        "relative mx-auto h-[80px] min-h-[80px] w-full max-w-2xl min-w-0 overflow-hidden rounded-xl sm:rounded-2xl",
+        "border border-white/[0.12] bg-[#070708]",
+        "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_28px_rgba(0,0,0,0.4)] ring-1 ring-white/[0.04]"
+      )}
+    >
       <iframe
-        title={`Spotify navbar player for ${title}`}
+        title={`Spotify: ${title}`}
         src={embedUrl}
         width="100%"
         height="80"
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
-        className="border-0"
+        className="absolute inset-0 h-full w-full border-0"
       />
     </div>
   );
@@ -808,7 +815,7 @@ function DashboardContent() {
   return (
     <div
       className={cn(
-        "relative min-h-screen overflow-x-hidden transition-colors duration-700",
+        "relative min-h-dvh overflow-x-hidden transition-colors duration-700",
         activeSection === "spotify" && "bg-[#050505] text-white"
       )}
     >
@@ -821,87 +828,146 @@ function DashboardContent() {
         )}
       />
 
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 overflow-x-hidden px-3 py-4 sm:gap-6 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
         <aside
           className={cn(
-            "sticky top-2 z-30 rounded-2xl border border-border/70 bg-card/75 p-3 backdrop-blur supports-[backdrop-filter]:bg-card/65 sm:top-4",
+            "sticky top-2 z-30 rounded-2xl border border-border/70 bg-card/75 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/65 sm:top-4 sm:px-4 sm:py-3.5",
             activeSection === "spotify" &&
               "border-white/10 bg-[#08080a]/85 text-white supports-[backdrop-filter]:bg-[#08080a]/75"
           )}
         >
-          <div className="grid gap-3 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-            <div className="flex min-w-0 items-center gap-3">
-              <div>
-                <p className="text-sm font-semibold">UpSkillr</p>
-                <p className="hidden text-xs text-muted-foreground sm:block">Student Workspace</p>
+          <div className="flex flex-col gap-3 sm:gap-3.5">
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold tracking-tight">UpSkillr</p>
+                <p className="hidden text-[11px] text-muted-foreground sm:block">
+                  Student workspace
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Home
+                </Link>
+                <AuthNavControls />
               </div>
             </div>
 
-            <nav className="flex max-w-full items-center gap-2 overflow-x-auto px-1 pb-1 lg:justify-center lg:pb-0">
-            {navSections.map((section) => {
-              const Icon = section.icon;
-              const active = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => setActiveSection(section.id)}
-                  className={cn(
-                    "flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-all sm:text-sm",
-                    active
-                      ? activeSection === "spotify"
-                        ? "bg-[#b11226] text-white shadow-lg shadow-[#b11226]/20"
-                        : "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {section.label}
-                </button>
-              );
-            })}
+            <nav
+              className={cn(
+                "flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 pt-px [-webkit-overflow-scrolling:touch]",
+                "[scrollbar-width:thin]",
+                "[&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/[0.12] [&::-webkit-scrollbar-track]:bg-transparent",
+                activeSection !== "spotify" &&
+                  "[&::-webkit-scrollbar-thumb]:bg-foreground/[0.12]",
+                "snap-x snap-mandatory"
+              )}
+            >
+              {navSections.map((section) => {
+                const Icon = section.icon;
+                const active = activeSection === section.id;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={cn(
+                      "flex shrink-0 snap-start items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-all sm:text-sm",
+                      active
+                        ? activeSection === "spotify"
+                          ? "bg-[#b11226] text-white shadow-lg shadow-[#b11226]/25"
+                          : "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                        : cn(
+                            "text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                            activeSection === "spotify" && "text-[#cfc8bc] hover:bg-white/[0.08]"
+                          )
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="whitespace-nowrap">{section.label}</span>
+                  </button>
+                );
+              })}
             </nav>
 
-            <div className="flex items-center justify-between gap-2 lg:justify-end">
-              {(selectedSpotifyPodcast || lastSpotifyPodcast || spotifyConnection?.connected) && (
-                <div className="hidden items-center gap-2 text-xs text-[#f6f1e8] lg:flex">
+            {(selectedSpotifyPodcast || lastSpotifyPodcast || spotifyConnection?.connected) && (
+              <div
+                className={cn(
+                  "flex flex-col gap-2.5 border-t pt-3 sm:gap-3",
+                  activeSection === "spotify" ? "border-white/[0.08]" : "border-border/50"
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Podcast className="size-3.5 shrink-0 text-[#1bd760]" aria-hidden />
+                    <span className="truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:text-[10px]">
+                      Now playing
+                    </span>
+                  </div>
+                  {selectedSpotifyPodcast?.title && (
+                    <span
+                      title={selectedSpotifyPodcast.title}
+                      className="hidden max-w-[45%] truncate text-xs font-medium text-foreground md:block lg:max-w-xs"
+                    >
+                      {selectedSpotifyPodcast.title}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={selectPreviousSpotifyItem}
-                    className="rounded-full border border-white/10 bg-white/[0.04] p-2 transition-colors hover:bg-white/10"
+                    className={cn(
+                      "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97]",
+                      activeSection === "spotify"
+                        ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
+                        : "border-border/80 bg-background/70 hover:bg-muted/80",
+                      spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
+                    )}
                     aria-label="Previous Spotify item"
                   >
-                    <SkipBack className="size-3.5" />
+                    <SkipBack className="size-4" />
                   </button>
-                  {selectedSpotifyPodcast?.embedUrl ? (
-                    <SpotifyNavbarPlayer
-                      title={selectedSpotifyPodcast.title}
-                      embedUrl={selectedSpotifyPodcast.embedUrl}
-                    />
-                  ) : lastSpotifyPodcast ? (
-                    <button
-                      type="button"
-                      onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
-                      className="max-w-72 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-left text-xs font-semibold text-[#f6f1e8] transition-colors hover:bg-white/10"
-                    >
-                      Continue {lastSpotifyPodcast.title}
-                    </button>
-                  ) : null}
+
+                  <div className="min-w-0 flex-1 px-px">
+                    {selectedSpotifyPodcast?.embedUrl ? (
+                      <SpotifyNavbarPlayer
+                        title={selectedSpotifyPodcast.title}
+                        embedUrl={selectedSpotifyPodcast.embedUrl}
+                      />
+                    ) : lastSpotifyPodcast ? (
+                      <button
+                        type="button"
+                        onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
+                        className={cn(
+                          "mx-auto flex w-full max-w-2xl justify-center rounded-full border px-4 py-2.5 text-left text-xs font-semibold transition-colors",
+                          activeSection === "spotify"
+                            ? "border-white/[0.14] bg-white/[0.06] text-[#f6f1e8] hover:bg-white/10"
+                            : "border-border/80 bg-muted/30 text-foreground hover:bg-muted/50"
+                        )}
+                      >
+                        <span className="line-clamp-2">{lastSpotifyPodcast.title}</span>
+                      </button>
+                    ) : null}
+                  </div>
+
                   <button
                     type="button"
                     onClick={selectNextSpotifyItem}
-                    className="rounded-full border border-white/10 bg-white/[0.04] p-2 transition-colors hover:bg-white/10"
+                    className={cn(
+                      "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97]",
+                      activeSection === "spotify"
+                        ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
+                        : "border-border/80 bg-background/70 hover:bg-muted/80",
+                      spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
+                    )}
                     aria-label="Next Spotify item"
                   >
-                    <SkipForward className="size-3.5" />
+                    <SkipForward className="size-4" />
                   </button>
                 </div>
-              )}
-              <Link href="/" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Home
-              </Link>
-              <AuthNavControls />
-            </div>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -966,7 +1032,7 @@ function DashboardContent() {
                       </button>
                     </div>
 
-                    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
+                    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,0.88fr)] xl:gap-8">
                       <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
@@ -975,18 +1041,18 @@ function DashboardContent() {
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <iframe
-                            title={`YouTube player for ${selectedVideo.title}`}
-                            src={`${selectedVideo.embedUrl}?rel=0&modestbranding=1&start=${Math.floor(
-                              videoStartSeconds
-                            )}`}
-                            width="100%"
-                            height="520"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            allowFullScreen
-                            loading="lazy"
-                            className="aspect-video h-auto min-h-[240px] rounded-2xl border-0 bg-black xl:min-h-[520px]"
-                          />
+                          <div className="relative aspect-video min-h-[12.5rem] w-full overflow-hidden rounded-2xl bg-black shadow-inner ring-1 ring-white/10">
+                            <iframe
+                              title={`YouTube player for ${selectedVideo.title}`}
+                              src={`${selectedVideo.embedUrl}?rel=0&modestbranding=1&start=${Math.floor(
+                                videoStartSeconds
+                              )}`}
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              allowFullScreen
+                              loading="lazy"
+                              className="absolute inset-0 h-full w-full border-0"
+                            />
+                          </div>
                         </CardContent>
                       </Card>
 
@@ -1048,7 +1114,7 @@ function DashboardContent() {
                             value={videoNote}
                             onChange={(event) => setVideoNote(event.target.value)}
                             placeholder="Write key concepts, timestamps, doubts, and practice tasks..."
-                            className="min-h-[320px] w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 text-sm text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60 xl:min-h-[520px]"
+                            className="min-h-[min(420px,calc(100dvh-14rem))] w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 text-base leading-relaxed text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60 sm:min-h-[360px] md:text-sm xl:min-h-[520px]"
                           />
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <p className="text-xs text-[#d6d0c6]/55">
@@ -1629,11 +1695,11 @@ function DashboardContent() {
                     </p>
                   )}
                   {spotifyLoading ? (
-                    <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-2">
+                    <div className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]">
                       {[1, 2, 3, 4].map((item) => (
                         <div
                           key={item}
-                          className="h-64 min-w-64 max-w-64 animate-pulse rounded-2xl bg-white/10"
+                          className="h-64 min-h-48 min-w-[min(16rem,calc(100dvw-2.5rem))] max-w-[min(16rem,calc(100dvw-2.5rem))] shrink-0 animate-pulse snap-start rounded-2xl bg-white/10"
                         />
                       ))}
                     </div>
@@ -1656,7 +1722,7 @@ function DashboardContent() {
                           </h4>
                           <p className="text-xs text-[#d6d0c6]/55">{row.subtitle}</p>
                         </div>
-                        <div className="flex max-w-full gap-3 overflow-x-auto overscroll-x-contain pb-2">
+                        <div className="flex max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]">
                           {row.items.map((podcast) => {
                             const selected = selectedSpotifyPodcast?.id === podcast.id;
                             return (
@@ -1665,7 +1731,8 @@ function DashboardContent() {
                                 type="button"
                                 onClick={() => handleSpotifyCardClick(podcast)}
                                 className={cn(
-                                  "group min-w-64 max-w-64 overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
+                                  "group shrink-0 snap-start overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
+                                  "min-h-48 min-w-[min(16rem,calc(100dvw-2.5rem))] max-w-[min(16rem,calc(100dvw-2.5rem))]",
                                   selected
                                     ? "border-[#b11226] shadow-lg shadow-[#b11226]/20"
                                     : "border-white/10"
@@ -1728,15 +1795,17 @@ function DashboardContent() {
             )}
 
             {activeSection === "community" && (
-              <CommunityWorkspace className="-m-4 rounded-[2rem] border border-white/10 bg-[#050506] p-4 md:p-5" />
+              <div className="-mx-3 min-h-[min(560px,calc(100dvh-14rem))] min-w-0 overflow-hidden sm:-m-4 md:min-h-[620px] lg:min-h-0">
+                <CommunityWorkspace className="h-full min-h-0 rounded-xl border border-white/10 bg-[#050506] p-3 sm:rounded-[1.75rem] sm:p-4 md:rounded-[2rem] md:p-5" />
+              </div>
             )}
 
           </div>
         </main>
       </div>
       {audioDrawerItem && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-md">
-          <div className="max-h-[86vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#08080a] text-[#f6f1e8] shadow-2xl">
+        <div className="fixed inset-0 z-50 grid max-h-[100dvh] place-items-center overflow-y-auto overscroll-none bg-black/75 p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-[calc(1rem+env(safe-area-inset-top,0px))] backdrop-blur-md">
+          <div className="max-h-[min(86vh,calc(100dvh-8rem))] w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10 bg-[#08080a] text-[#f6f1e8] shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 p-5">
               <div className="flex min-w-0 gap-4">
                 <div
@@ -1789,7 +1858,7 @@ function DashboardContent() {
                 </button>
               </div>
             </div>
-            <div className="max-h-[62vh] overflow-y-auto p-4">
+            <div className="max-h-[min(62vh,calc(100dvh-12rem))] overflow-y-auto p-4 sm:p-5">
               {audioDrawerLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3, 4].map((item) => (
@@ -1806,7 +1875,7 @@ function DashboardContent() {
                       <div
                         key={item.id}
                         className={cn(
-                          "flex w-full gap-3 rounded-2xl border bg-white/[0.03] p-3 text-left transition-colors",
+                          "flex w-full flex-col gap-3 rounded-2xl border bg-white/[0.03] p-3 text-left transition-colors sm:flex-row sm:items-center",
                           selected ? "border-[#b11226]" : "border-white/10"
                         )}
                       >
@@ -1828,7 +1897,7 @@ function DashboardContent() {
                             selectSpotifyAudio(item);
                             setAudioDrawerItem(null);
                           }}
-                          className="self-center rounded-full bg-[#b11226] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f]"
+                          className="self-start rounded-full bg-[#b11226] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f] sm:self-center"
                         >
                           {selected ? "Playing" : "Play"}
                         </button>

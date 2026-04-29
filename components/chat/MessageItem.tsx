@@ -63,7 +63,7 @@ export function MessageItem({
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm text-[#f6f1e8] outline-none ring-0 transition focus:border-[#b11226]"
+              className="min-h-20 w-full resize-none rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-base text-[#f6f1e8] outline-none ring-0 transition focus:border-[#b11226] md:text-sm"
               autoFocus
             />
             <div className="flex flex-wrap items-center gap-2">
@@ -93,7 +93,7 @@ export function MessageItem({
         )}
       </div>
       {canManage && !editing && (
-        <div className="flex opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 opacity-100 transition-opacity xl:opacity-0 xl:group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"

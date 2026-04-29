@@ -122,7 +122,7 @@ export function ChatWindow({
   };
 
   return (
-    <section className="flex h-full min-h-[560px] overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0e] text-[#f6f1e8] shadow-2xl shadow-black/25 sm:min-h-[680px]">
+    <section className="flex h-full min-h-[320px] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b0e] text-[#f6f1e8] shadow-2xl shadow-black/25 sm:min-h-[420px] sm:rounded-3xl md:min-h-[520px]">
       <div className="flex min-h-0 flex-1 flex-col">
       <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#0b0b0e]/95 px-4 py-3 backdrop-blur sm:px-5 sm:py-4">
         <div className="flex min-w-0 items-center gap-2">
@@ -136,7 +136,7 @@ export function ChatWindow({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-[#d6d0c6]/65">
+        <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-[#d6d0c6]/65">
           <Radio className="size-3.5" />
           {presence.onlineUsers.length} online
           {presence.isTyping && <span>• typing...</span>}

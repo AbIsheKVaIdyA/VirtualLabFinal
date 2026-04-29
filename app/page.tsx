@@ -82,15 +82,18 @@ const dashboardPreview = [
 
 export default function Home() {
   return (
-    <div className="relative overflow-hidden bg-background">
+    <div className="relative overflow-x-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_34%,transparent),transparent_36%),radial-gradient(circle_at_85%_8%,color-mix(in_oklab,var(--accent)_28%,transparent),transparent_34%)]" />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-6 sm:px-6 sm:py-10 lg:gap-14 lg:px-10">
-        <header className="grid gap-4 sm:flex sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold tracking-tight">UpSkillr</p>
+      <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-10 lg:gap-14 lg:px-10">
+        <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2">
+            <p className="truncate font-semibold tracking-tight">UpSkillr</p>
           </div>
-          <div className="flex items-center justify-between gap-2 sm:justify-end">
-            <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+          <div className="flex min-w-0 flex-wrap items-stretch justify-between gap-x-3 gap-y-2 sm:justify-end sm:gap-x-4">
+            <Link
+              href="/dashboard"
+              className={cn(buttonVariants({ size: "sm" }), "w-full justify-center sm:w-auto")}
+            >
               Open Dashboard
             </Link>
             <AuthNavControls />
@@ -100,7 +103,7 @@ export default function Home() {
         <section className="grid items-center gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-8">
           <div className="space-y-6">
             <div className="space-y-4">
-              <h1 className="max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              <h1 className="max-w-4xl text-balance text-3xl font-bold tracking-tight min-[390px]:text-4xl sm:text-5xl md:text-6xl lg:text-7xl">
                 Learn through courses, community, and focused study habits.
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground md:text-lg">

@@ -17,13 +17,13 @@ export function ChannelSidebar({
   onSelect: (channelId: string) => void;
 }) {
   return (
-    <aside className="border-b border-white/10 bg-[#0b0b0e] p-3 text-[#f6f1e8] lg:w-72 lg:border-b-0 lg:border-r lg:p-4">
+    <aside className="border-b border-white/10 bg-[#0b0b0e] p-3 text-[#f6f1e8] md:w-72 md:flex-shrink-0 md:border-b-0 md:border-r md:p-4">
       <div className="mb-3 lg:mb-5">
         <p className="text-base font-semibold">{server?.name ?? "Server"}</p>
         <p className="hidden text-xs text-[#d6d0c6]/55 sm:block">Learning workspace</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:block lg:space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 md:block md:space-y-5">
         <ChannelGroup
           title="Text Channels"
           channels={channels.filter((channel) => channel.type === "text")}
@@ -57,7 +57,7 @@ function ChannelGroup({
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#d6d0c6]/45">
         {title}
       </p>
-      <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
+      <div className="flex gap-2 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
         {channels.map((channel) => {
           const Icon = channel.type === "voice" ? Mic2 : Hash;
           return (
@@ -66,7 +66,7 @@ function ChannelGroup({
               type="button"
               onClick={() => onSelect(channel.id)}
               className={cn(
-                "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors lg:w-full",
+                "flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors md:w-full",
                 activeChannelId === channel.id
                   ? "bg-[#b11226] text-white shadow-lg shadow-[#b11226]/15"
                   : "text-[#d6d0c6]/65 hover:bg-white/[0.06] hover:text-[#f6f1e8]"

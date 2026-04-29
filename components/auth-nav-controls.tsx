@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export function AuthNavControls() {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-shrink-0 flex-wrap items-center justify-end gap-2">
       <Show when="signed-out">
         <SignInButton mode="modal">
           <Button variant="outline" size="sm">
