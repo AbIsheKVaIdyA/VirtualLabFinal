@@ -1589,9 +1589,8 @@ function DashboardContent() {
                               key={note.videoId}
                               className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
                             >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  {renamingNoteVideoId === note.videoId ? (
+                              <div className="min-w-0">
+                                {renamingNoteVideoId === note.videoId ? (
                                     <input
                                       value={
                                         noteTitleDrafts[note.videoId] ??
@@ -1668,8 +1667,6 @@ function DashboardContent() {
                                     Updated {new Date(note.updatedAt).toLocaleString()}
                                   </p>
                                 </div>
-                                <NotebookPen className="size-5 shrink-0 text-blue-300" />
-                              </div>
                               <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-relaxed text-[#d6d0c6]/70">
                                 {note.content || "Empty note"}
                               </p>
