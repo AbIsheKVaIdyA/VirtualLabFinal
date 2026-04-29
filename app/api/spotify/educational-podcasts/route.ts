@@ -398,7 +398,11 @@ export async function GET(request: NextRequest) {
     );
     const podcasts = uniqueRecommendations(results.flat())
       .sort((first, second) => second.score - first.score)
-      .map(({ score: _score, ...podcast }) => podcast);
+      .map((item) => {
+        const { score, ...podcast } = item;
+        void score;
+        return podcast;
+      });
 
     return withRefreshedCookie({
       connected: true,

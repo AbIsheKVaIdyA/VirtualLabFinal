@@ -15,6 +15,7 @@ import {
   Link2,
   ListMusic,
   NotebookPen,
+  Pencil,
   PlayCircle,
   Podcast,
   Save,
@@ -55,6 +56,60 @@ const courseCategories = [
   "Career",
 ];
 
+/** Each shelf calls `/api/youtube/courses` once (YouTube API returns **3 videos** per topic). */
+const VIDEO_RECOMMENDATION_SECTIONS = [
+  {
+    slug: "mixed",
+    title: "Mixed recommendations",
+    description: "A broad mix across popular learning angles.",
+    topic: "All",
+    accent: "from-blue-600/25 to-white/[0.03]",
+  },
+  {
+    slug: "python",
+    title: "Python",
+    description: "Python fundamentals, scripting, and small projects.",
+    topic: "Python",
+    accent: "from-emerald-500/20 to-white/[0.03]",
+  },
+  {
+    slug: "cybersecurity",
+    title: "Cybersecurity",
+    description: "Security basics, ethical hacking, and defensive fundamentals.",
+    topic: "Cybersecurity",
+    accent: "from-red-500/20 to-white/[0.03]",
+  },
+  {
+    slug: "web",
+    title: "Web development",
+    description: "HTML, CSS, JavaScript, and full‑stack ramps.",
+    topic: "Web Development",
+    accent: "from-cyan-500/20 to-white/[0.03]",
+  },
+  {
+    slug: "ai",
+    title: "AI & machine learning",
+    description: "Intro ML demos and applied AI playlists.",
+    topic: "AI",
+    accent: "from-violet-500/20 to-white/[0.03]",
+  },
+  {
+    slug: "dataScience",
+    title: "Data science",
+    description: "Notebooks, analysis, and data workflows.",
+    topic: "Data Science",
+    accent: "from-amber-500/20 to-white/[0.03]",
+  },
+  {
+    slug: "java",
+    title: "Java programming",
+    description: "OOP fundamentals, syntax, and course-style walkthroughs.",
+    topic: "Java",
+    accent: "from-orange-500/20 to-white/[0.03]",
+  },
+] as const;
+
+
 type SpotifyPodcast = {
   id: string;
   title: string;
@@ -91,6 +146,9 @@ type LearningVideo = {
   youtubeUrl: string;
   topic: string;
 };
+
+type VideoShelfSlug = (typeof VIDEO_RECOMMENDATION_SECTIONS)[number]["slug"];
+type VideosByShelf = Partial<Record<VideoShelfSlug, LearningVideo[]>>;
 
 type SavedVideoNote = {
   videoId: string;
@@ -212,9 +270,13 @@ function DashboardContent() {
   /** Shows navbar mini-player only after user explicitly starts playback via selectSpotifyAudio (not mere connect / auto-selection). */
   const [spotifyNavbarActive, setSpotifyNavbarActive] = useState(false);
   const [recentSpotifyListens, setRecentSpotifyListens] = useState<SpotifyListenEntry[]>([]);
+  /** Browse catalog loaded after first successful `/educational-podcasts` fetch; revisit tab without refetching. */
+  const spotifyBrowseLoadedRef = useRef(false);
   /** Start offset (seconds) passed into Spotify embed URLs for resume-at-position. */
   const [spotifyIframeResumeSeconds, setSpotifyIframeResumeSeconds] = useState(0);
-  const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
+  /** Topic shelves (`/courses` × N topics); first successful load caches for the session (see videosShelvesLoadedRef). */
+  const [learningVideosByShelf, setLearningVideosByShelf] = useState<VideosByShelf>({});
+  const videosShelvesLoadedRef = useRef(false);
   const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosMessage, setVideosMessage] = useState<string | null>(null);
@@ -223,6 +285,8 @@ function DashboardContent() {
   const [videoStudioOpen, setVideoStudioOpen] = useState(false);
   const [noteSearch, setNoteSearch] = useState("");
   const [noteTitleDrafts, setNoteTitleDrafts] = useState<Record<string, string>>({});
+  /** Note list: only this card shows an editable title field (after Rename). */
+  const [renamingNoteVideoId, setRenamingNoteVideoId] = useState<string | null>(null);
   const [savedVideoNotes, setSavedVideoNotes] = useState<SavedVideoNote[]>([]);
   const [noteHistory, setNoteHistory] = useState<NoteHistoryEntry[]>([]);
   const [studyStartedAt, setStudyStartedAt] = useState<number | null>(null);
@@ -254,6 +318,14 @@ function DashboardContent() {
       }))
       .filter((row) => row.items.length > 0);
   }, [spotifyPodcasts]);
+  const totalVideoShelfVideos = useMemo(
+    () =>
+      VIDEO_RECOMMENDATION_SECTIONS.reduce(
+        (total, section) => total + (learningVideosByShelf[section.slug]?.length ?? 0),
+        0
+      ),
+    [learningVideosByShelf]
+  );
   const selectedAudioIndex = selectedSpotifyPodcast
     ? spotifyPodcasts.findIndex((item) => item.id === selectedSpotifyPodcast.id)
     : -1;
@@ -505,8 +577,9 @@ function DashboardContent() {
     );
     setSavedVideoNotes(nextIndex);
     setNoteTitleDrafts((current) => {
-      const { [note.videoId]: _deleted, ...rest } = current;
-      return rest;
+      const next = { ...current };
+      delete next[note.videoId];
+      return next;
     });
 
     if (selectedVideo?.id === note.videoId) {
@@ -660,33 +733,61 @@ function DashboardContent() {
 
   useEffect(() => {
     if (activeSection !== "videos") return;
+    if (videosShelvesLoadedRef.current) return;
 
     const controller = new AbortController();
-    const params = new URLSearchParams({ topic: "All" });
-
     setVideosLoading(true);
-    fetch(`/api/youtube/courses?${params.toString()}`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then((res) => res.json())
-      .then((data: { message?: string; videos?: LearningVideo[] }) => {
-        const videos = data.videos ?? [];
-        setLearningVideos(videos);
-        setSelectedVideo((current) =>
-          current && videos.some((video) => video.id === current.id)
-            ? current
-            : null
+
+    void (async () => {
+      try {
+        const rows = await Promise.all(
+          VIDEO_RECOMMENDATION_SECTIONS.map(async (section) => {
+            const params = new URLSearchParams({ topic: section.topic });
+            const res = await fetch(`/api/youtube/courses?${params.toString()}`, {
+              cache: "no-store",
+              signal: controller.signal,
+            });
+            const data = (await res.json()) as {
+              message?: string | null;
+              videos?: LearningVideo[];
+            };
+            return {
+              slug: section.slug,
+              videos: data.videos ?? [],
+              message: data.message,
+            };
+          })
         );
-        setVideosMessage(data.message ?? "YouTube course videos loaded.");
-      })
-      .catch((error: unknown) => {
+
+        const next: VideosByShelf = {};
+        for (const row of rows) {
+          next[row.slug] = row.videos;
+        }
+
+        const merged = rows.flatMap((row) => row.videos);
+
+        videosShelvesLoadedRef.current = true;
+        setLearningVideosByShelf(next);
+        setSelectedVideo((current) =>
+          current && merged.some((video) => video.id === current.id) ? current : null
+        );
+
+        const firstNote = rows.find((r) => r.message)?.message ?? null;
+        setVideosMessage(
+          merged.length
+            ? (firstNote ?? "YouTube picks loaded.")
+            : (firstNote ??
+                "No YouTube course videos matched these topics yet. Check YOUTUBE_API_KEY and try again.")
+        );
+      } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        setLearningVideos([]);
+        setLearningVideosByShelf({});
         setSelectedVideo(null);
         setVideosMessage("Could not load YouTube videos right now.");
-      })
-      .finally(() => setVideosLoading(false));
+      } finally {
+        setVideosLoading(false);
+      }
+    })();
 
     return () => controller.abort();
   }, [activeSection]);
@@ -807,7 +908,6 @@ function DashboardContent() {
   useEffect(() => {
     if (activeSection !== "spotify") return;
 
-    queueMicrotask(() => setSpotifyConnection(null));
     fetch("/api/spotify/me", { cache: "no-store" })
       .then((res) => res.json())
       .then((data: SpotifyConnection) => setSpotifyConnection(data))
@@ -822,6 +922,7 @@ function DashboardContent() {
   useEffect(() => {
     if (!spotifyConnection?.connected) {
       queueMicrotask(() => {
+        spotifyBrowseLoadedRef.current = false;
         setSpotifyPodcasts([]);
         setSpotifyMessage(null);
         setSpotifyLoading(false);
@@ -831,6 +932,10 @@ function DashboardContent() {
     }
 
     if (activeSection !== "spotify") return;
+
+    if (spotifyBrowseLoadedRef.current) {
+      return;
+    }
 
     const controller = new AbortController();
     const params = new URLSearchParams({ category: "All" });
@@ -848,6 +953,7 @@ function DashboardContent() {
           podcasts?: SpotifyPodcast[];
         }) => {
           const podcasts = data.podcasts ?? [];
+          spotifyBrowseLoadedRef.current = true;
           setSpotifyPodcasts(podcasts);
           setSelectedSpotifyPodcast((current) => {
             if (current && podcasts.some((podcast) => podcast.id === current.id)) {
@@ -873,7 +979,7 @@ function DashboardContent() {
       .finally(() => setSpotifyLoading(false));
 
     return () => controller.abort();
-  }, [activeSection, spotifyConnection?.connected, lastSpotifyPodcast]);
+  }, [activeSection, spotifyConnection?.connected]);
 
   return (
     <div
@@ -1332,72 +1438,104 @@ function DashboardContent() {
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
                           <Search className="size-5 text-blue-300" />
-                          Recommended courses
+                          Recommendations by topic
                         </CardTitle>
                         <p className="text-sm text-[#d6d0c6]/60">
-                          A small set of videos per load to keep API usage low.
+                          Each topic uses one YouTube search capped at exactly three playable videos.
+                          Shelves load once per visit to this dashboard session.
                         </p>
                       </CardHeader>
                       <CardContent>
                         {videosLoading ? (
-                          <div className="grid gap-3 md:grid-cols-3">
-                            {[1, 2, 3].map((item) => (
-                              <div
-                                key={item}
-                                className="h-64 animate-pulse rounded-2xl bg-white/10"
-                              />
+                          <div className="space-y-10">
+                            {VIDEO_RECOMMENDATION_SECTIONS.map((section) => (
+                              <div key={section.slug} className="space-y-3">
+                                <div className="h-5 max-w-[14rem] animate-pulse rounded-lg bg-white/10" />
+                                <div className="grid gap-3 md:grid-cols-3">
+                                  {[1, 2, 3].map((item) => (
+                                    <div
+                                      key={`${section.slug}-${item}`}
+                                      className="h-64 animate-pulse rounded-2xl bg-white/10"
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             ))}
                           </div>
-                        ) : learningVideos.length ? (
-                          <div className="grid gap-3 md:grid-cols-3">
-                            {learningVideos.map((video) => (
-                              <button
-                                key={video.id}
-                                type="button"
-                                onClick={() => {
-                                  openVideoStudyRoom(video, true);
-                                }}
-                                className="group min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#111113] text-left transition-all hover:-translate-y-1 hover:border-blue-500 hover:bg-[#171719]"
-                              >
-                                <div
-                                  className="h-44 bg-[#141416] bg-cover bg-center"
-                                  style={
-                                    video.thumbnailUrl
-                                      ? { backgroundImage: `url(${video.thumbnailUrl})` }
-                                      : undefined
-                                  }
-                                >
-                                  <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/80 p-3">
-                                    <Badge className="bg-black/70 text-white hover:bg-black/70">
-                                      {video.topic}
-                                    </Badge>
-                                    <span className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-transform group-hover:scale-105">
-                                      {getRecentProgress(video.id) > 0 ? "Resume" : "Open"}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="space-y-2 p-4">
-                                  <p className="line-clamp-2 font-bold text-[#f6f1e8]">
-                                    {video.title}
-                                  </p>
-                                  <p className="line-clamp-1 text-xs text-[#d6d0c6]/50">
-                                    {video.channelTitle}
-                                  </p>
-                                  {getRecentProgress(video.id) > 0 && (
-                                    <p className="text-xs font-semibold text-blue-200">
-                                      Resume from {formatVideoProgress(getRecentProgress(video.id))}
+                        ) : totalVideoShelfVideos ? (
+                          <div className="space-y-10">
+                            {VIDEO_RECOMMENDATION_SECTIONS.map((section) => {
+                              const shelf = learningVideosByShelf[section.slug] ?? [];
+
+                              if (!shelf.length) return null;
+
+                              return (
+                                <section key={section.slug} className="min-w-0 space-y-3">
+                                  <div
+                                    className={cn(
+                                      "rounded-2xl border border-white/10 bg-gradient-to-br p-4",
+                                      section.accent
+                                    )}
+                                  >
+                                    <h3 className="text-lg font-black text-[#f6f1e8]">{section.title}</h3>
+                                    <p className="mt-2 text-sm text-[#d6d0c6]/65">{section.description}</p>
+                                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#d6d0c6]/35">
+                                      Up to 3 videos · {section.topic === "All" ? "mixed query" : section.topic}
                                     </p>
-                                  )}
-                                  <p className="line-clamp-3 text-xs leading-relaxed text-[#d6d0c6]/60">
-                                    {video.description}
-                                  </p>
-                                </div>
-                              </button>
-                            ))}
+                                  </div>
+                                  <div className="grid gap-3 md:grid-cols-3">
+                                    {shelf.map((video) => (
+                                      <button
+                                        key={`${section.slug}-${video.id}`}
+                                        type="button"
+                                        onClick={() => {
+                                          openVideoStudyRoom(video, true);
+                                        }}
+                                        className="group min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#111113] text-left transition-all hover:-translate-y-1 hover:border-blue-500 hover:bg-[#171719]"
+                                      >
+                                        <div
+                                          className="h-44 bg-[#141416] bg-cover bg-center"
+                                          style={
+                                            video.thumbnailUrl
+                                              ? { backgroundImage: `url(${video.thumbnailUrl})` }
+                                              : undefined
+                                          }
+                                        >
+                                          <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/80 p-3">
+                                            <Badge className="bg-black/70 text-white hover:bg-black/70">
+                                              {video.topic}
+                                            </Badge>
+                                            <span className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-transform group-hover:scale-105">
+                                              {getRecentProgress(video.id) > 0 ? "Resume" : "Open"}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2 p-4">
+                                          <p className="line-clamp-2 font-bold text-[#f6f1e8]">{video.title}</p>
+                                          <p className="line-clamp-1 text-xs text-[#d6d0c6]/50">
+                                            {video.channelTitle}
+                                          </p>
+                                          {getRecentProgress(video.id) > 0 && (
+                                            <p className="text-xs font-semibold text-blue-200">
+                                              Resume from{" "}
+                                              {formatVideoProgress(getRecentProgress(video.id))}
+                                            </p>
+                                          )}
+                                          <p className="line-clamp-3 text-xs leading-relaxed text-[#d6d0c6]/60">
+                                            {video.description}
+                                          </p>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </section>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
-                            No videos loaded yet. Check that `YOUTUBE_API_KEY` is configured, then reload.
+                            No videos loaded yet. Check that `YOUTUBE_API_KEY` is configured, then reload this
+                            page so each topic shelf can fetch its three picks.
                           </div>
                         )}
                       </CardContent>
@@ -1453,29 +1591,75 @@ function DashboardContent() {
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
-                                  <input
-                                    value={
-                                      noteTitleDrafts[note.videoId] ??
-                                      note.noteTitle ??
-                                      note.videoTitle
-                                    }
-                                    onChange={(event) =>
-                                      setNoteTitleDrafts((current) => ({
-                                        ...current,
-                                        [note.videoId]: event.target.value,
-                                      }))
-                                    }
-                                    onBlur={(event) =>
-                                      renameSavedNote(note.videoId, event.target.value)
-                                    }
-                                    onKeyDown={(event) => {
-                                      if (event.key === "Enter") {
-                                        event.currentTarget.blur();
+                                  {renamingNoteVideoId === note.videoId ? (
+                                    <input
+                                      value={
+                                        noteTitleDrafts[note.videoId] ??
+                                        note.noteTitle ??
+                                        note.videoTitle
                                       }
-                                    }}
-                                    className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60"
-                                    aria-label="Rename note"
-                                  />
+                                      onChange={(event) =>
+                                        setNoteTitleDrafts((current) => ({
+                                          ...current,
+                                          [note.videoId]: event.target.value,
+                                        }))
+                                      }
+                                      onBlur={(event) => {
+                                        const trimmed = event.target.value.trim();
+                                        if (trimmed) {
+                                          renameSavedNote(note.videoId, trimmed);
+                                        } else {
+                                          setNoteTitleDrafts((current) => ({
+                                            ...current,
+                                            [note.videoId]:
+                                              note.noteTitle ?? note.videoTitle ?? "",
+                                          }));
+                                        }
+                                        setRenamingNoteVideoId(null);
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") {
+                                          event.preventDefault();
+                                          event.currentTarget.blur();
+                                        }
+                                        if (event.key === "Escape") {
+                                          event.preventDefault();
+                                          setNoteTitleDrafts((current) => ({
+                                            ...current,
+                                            [note.videoId]:
+                                              note.noteTitle ?? note.videoTitle ?? "",
+                                          }));
+                                          setRenamingNoteVideoId(null);
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm font-bold text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60"
+                                      aria-label="Edit note title"
+                                    />
+                                  ) : (
+                                    <div className="flex min-w-0 items-start gap-2">
+                                      <p className="min-w-0 flex-1 break-words text-sm font-bold text-[#f6f1e8]">
+                                        {noteTitleDrafts[note.videoId] ??
+                                          note.noteTitle ??
+                                          note.videoTitle}
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setRenamingNoteVideoId(note.videoId);
+                                          setNoteTitleDrafts((current) => ({
+                                            ...current,
+                                            [note.videoId]:
+                                              note.noteTitle ?? note.videoTitle ?? "",
+                                          }));
+                                        }}
+                                        className="shrink-0 rounded-lg border border-white/15 bg-white/[0.04] p-1.5 text-blue-300 transition-colors hover:bg-white/10"
+                                        aria-label="Rename note"
+                                      >
+                                        <Pencil className="size-4" />
+                                      </button>
+                                    </div>
+                                  )}
                                   <p className="mt-1 text-xs text-blue-200">
                                     Video: {note.videoTitle}
                                   </p>
@@ -1601,8 +1785,7 @@ function DashboardContent() {
                 ) : (
                   <>
                 <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_0%_0%,rgba(177,18,38,0.22),transparent_32%),linear-gradient(135deg,#171719_0%,#080809_48%,#130305_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
-                  <div className="space-y-5">
-                    <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
                         <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
                           Study audio for every session.
@@ -1617,31 +1800,6 @@ function DashboardContent() {
                           ? ` · ${spotifyConnection.profile.product}`
                           : ""}
                       </div>
-                    </div>
-                    {(selectedSpotifyPodcast || lastSpotifyPodcast) && (
-                      <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3">
-                        <div
-                          className="size-14 shrink-0 rounded-xl bg-[#141416] bg-cover bg-center"
-                          style={
-                            (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
-                              ? {
-                                  backgroundImage: `url(${
-                                    (selectedSpotifyPodcast ?? lastSpotifyPodcast)?.imageUrl
-                                  })`,
-                                }
-                              : undefined
-                          }
-                        />
-                        <div className="min-w-0">
-                          <p className="line-clamp-1 text-sm font-bold text-[#f6f1e8]">
-                            {selectedSpotifyPodcast?.title ?? lastSpotifyPodcast?.title}
-                          </p>
-                          <p className="line-clamp-1 text-xs text-[#d6d0c6]/55">
-                            {selectedSpotifyPodcast ? "Playing in navbar" : "Ready to continue"}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </section>
 

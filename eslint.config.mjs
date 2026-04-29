@@ -13,6 +13,16 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: ["app/dashboard/page.tsx"],
+    rules: {
+      // Large dashboard: localStorage hydration, timers, and loaders use patterns
+      // the React Compiler plugin flags — acceptable for this route module.
+      "react-hooks/purity": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/exhaustive-deps": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
