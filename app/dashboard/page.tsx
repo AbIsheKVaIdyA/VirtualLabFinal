@@ -775,7 +775,7 @@ function DashboardContent() {
         const firstNote = rows.find((r) => r.message)?.message ?? null;
         setVideosMessage(
           merged.length
-            ? (firstNote ?? "YouTube picks loaded.")
+            ? firstNote
             : (firstNote ??
                 "No YouTube course videos matched these topics yet. Check YOUTUBE_API_KEY and try again.")
         );
