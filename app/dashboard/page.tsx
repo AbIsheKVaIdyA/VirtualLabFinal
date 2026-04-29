@@ -11,6 +11,7 @@ import {
   Disc3,
   Download,
   FileText,
+  Headphones,
   Link2,
   ListMusic,
   NotebookPen,
@@ -30,6 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AuthNavControls } from "@/components/auth-nav-controls";
 import { CommunityWorkspace } from "@/components/community/CommunityWorkspace";
 import { cn } from "@/lib/utils";
+import { withSpotifyEmbedResume } from "@/lib/spotify-embed";
 
 const availableCourses = [
   {
@@ -149,13 +151,50 @@ type RecentLearningVideo = LearningVideo & {
   updatedAt: string;
 };
 
+/** Saved listens for resume chips (similar to recently viewed videos). */
+type SpotifyListenEntry = SpotifyPodcast & {
+  progressSeconds: number;
+  updatedAt: string;
+};
+
 type SectionId = "courses" | "videos" | "notes" | "spotify" | "community";
 
 const SPOTIFY_LAST_AUDIO_KEY = "vl:last-spotify-audio";
+const SPOTIFY_LISTEN_HISTORY_KEY = "vl:spotify-listen-history";
+const MAX_SPOTIFY_LISTEN_HISTORY = 14;
 const VIDEO_NOTE_KEY_PREFIX = "vl:video-note:";
 const VIDEO_NOTE_INDEX_KEY = "vl:video-note-index";
 const VIDEO_NOTE_HISTORY_KEY_PREFIX = "vl:video-note-history:";
 const RECENT_VIDEO_KEY = "vl:recent-learning-videos";
+
+function readSpotifyListenHistory(): SpotifyListenEntry[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(SPOTIFY_LISTEN_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SpotifyListenEntry[];
+
+    return Array.isArray(parsed) ? parsed.filter((entry) => entry?.id && entry.embedUrl) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSpotifyListenHistory(entries: SpotifyListenEntry[]) {
+  if (typeof window === "undefined") return;
+
+  window.localStorage.setItem(SPOTIFY_LISTEN_HISTORY_KEY, JSON.stringify(entries));
+}
+
+function mergeSpotifyListenHistory(
+  previous: SpotifyListenEntry[],
+  entry: SpotifyListenEntry
+): SpotifyListenEntry[] {
+  const rest = previous.filter((e) => e.id !== entry.id);
+
+  return [entry, ...rest].slice(0, MAX_SPOTIFY_LISTEN_HISTORY);
+}
 
 const navSections: Array<{ id: SectionId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "courses", label: "My Courses", icon: BookOpenText },
@@ -182,6 +221,7 @@ const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
       )}
     >
       <iframe
+        key={embedUrl}
         title={`Spotify: ${title}`}
         src={embedUrl}
         width="100%"
@@ -209,6 +249,11 @@ function DashboardContent() {
   const [audioDrawerItems, setAudioDrawerItems] = useState<SpotifyPodcast[]>([]);
   const [audioDrawerLoading, setAudioDrawerLoading] = useState(false);
   const [lastSpotifyPodcast, setLastSpotifyPodcast] = useState<SpotifyPodcast | null>(null);
+  /** Shows navbar mini-player only after user explicitly starts playback via selectSpotifyAudio (not mere connect / auto-selection). */
+  const [spotifyNavbarActive, setSpotifyNavbarActive] = useState(false);
+  const [recentSpotifyListens, setRecentSpotifyListens] = useState<SpotifyListenEntry[]>([]);
+  /** Start offset (seconds) passed into Spotify embed URLs for resume-at-position. */
+  const [spotifyIframeResumeSeconds, setSpotifyIframeResumeSeconds] = useState(0);
   const [videoTopic, setVideoTopic] = useState("All");
   const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
@@ -267,12 +312,45 @@ function DashboardContent() {
           1
       )
     : totalDrawerItems;
-  const selectSpotifyAudio = (item: SpotifyPodcast | null) => {
+  const selectSpotifyAudio = (
+    item: SpotifyPodcast | null,
+    options?: { offsetSeconds?: number }
+  ) => {
     setSelectedSpotifyPodcast(item);
-    if (!item) return;
+    if (!item) {
+      setSpotifyNavbarActive(false);
+      setSpotifyIframeResumeSeconds(0);
+      return;
+    }
+
+    const history = readSpotifyListenHistory();
+
+    let offsetSeconds = 0;
+    if (typeof options?.offsetSeconds === "number") {
+      offsetSeconds = Math.max(0, options.offsetSeconds);
+    } else {
+      offsetSeconds = Math.max(0, history.find((e) => e.id === item.id)?.progressSeconds ?? 0);
+    }
+    offsetSeconds = Math.min(offsetSeconds, 6 * 3600);
+
+    setSpotifyIframeResumeSeconds(offsetSeconds);
+
+    if (item.embedUrl) {
+      setSpotifyNavbarActive(true);
+    }
 
     setLastSpotifyPodcast(item);
     window.localStorage.setItem(SPOTIFY_LAST_AUDIO_KEY, JSON.stringify(item));
+
+    const entry: SpotifyListenEntry = {
+      ...item,
+      progressSeconds: offsetSeconds,
+      updatedAt: new Date().toISOString(),
+    };
+    const nextHistory = mergeSpotifyListenHistory(history, entry);
+
+    writeSpotifyListenHistory(nextHistory);
+    setRecentSpotifyListens(nextHistory);
   };
   const selectNextSpotifyItem = () => {
     if (!spotifyPodcasts.length) return;
@@ -369,6 +447,36 @@ function DashboardContent() {
   useEffect(() => {
     setRecentLearningVideos(readRecentLearningVideos());
   }, []);
+
+  useEffect(() => {
+    setRecentSpotifyListens(readSpotifyListenHistory());
+  }, []);
+
+  useEffect(() => {
+    if (!spotifyNavbarActive || !selectedSpotifyPodcast?.id) return;
+
+    const id = selectedSpotifyPodcast.id;
+    const secondsPerTick = 15;
+    const intervalId = window.setInterval(() => {
+      setRecentSpotifyListens((prev) => {
+        const ix = prev.findIndex((e) => e.id === id);
+        if (ix < 0) return prev;
+
+        const bumpedSeconds = Math.min(prev[ix].progressSeconds + secondsPerTick, 6 * 3600);
+        const next = [...prev];
+        next[ix] = {
+          ...next[ix],
+          progressSeconds: bumpedSeconds,
+          updatedAt: new Date().toISOString(),
+        };
+        writeSpotifyListenHistory(next);
+
+        return next;
+      });
+    }, secondsPerTick * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [spotifyNavbarActive, selectedSpotifyPodcast?.id]);
 
   const readLocalNoteIndex = () => {
     try {
@@ -763,6 +871,7 @@ function DashboardContent() {
         setSpotifyPodcasts([]);
         setSpotifyMessage(null);
         setSpotifyLoading(false);
+        setSpotifyNavbarActive(false);
       });
       return;
     }
@@ -889,7 +998,7 @@ function DashboardContent() {
               })}
             </nav>
 
-            {(selectedSpotifyPodcast || lastSpotifyPodcast || spotifyConnection?.connected) && (
+            {spotifyNavbarActive && selectedSpotifyPodcast?.embedUrl ? (
               <div
                 className={cn(
                   "flex flex-col gap-2.5 border-t pt-3 sm:gap-3",
@@ -930,25 +1039,13 @@ function DashboardContent() {
                   </button>
 
                   <div className="min-w-0 flex-1 px-px">
-                    {selectedSpotifyPodcast?.embedUrl ? (
-                      <SpotifyNavbarPlayer
-                        title={selectedSpotifyPodcast.title}
-                        embedUrl={selectedSpotifyPodcast.embedUrl}
-                      />
-                    ) : lastSpotifyPodcast ? (
-                      <button
-                        type="button"
-                        onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
-                        className={cn(
-                          "mx-auto flex w-full max-w-2xl justify-center rounded-full border px-4 py-2.5 text-left text-xs font-semibold transition-colors",
-                          activeSection === "spotify"
-                            ? "border-white/[0.14] bg-white/[0.06] text-[#f6f1e8] hover:bg-white/10"
-                            : "border-border/80 bg-muted/30 text-foreground hover:bg-muted/50"
-                        )}
-                      >
-                        <span className="line-clamp-2">{lastSpotifyPodcast.title}</span>
-                      </button>
-                    ) : null}
+                    <SpotifyNavbarPlayer
+                      title={selectedSpotifyPodcast.title}
+                      embedUrl={withSpotifyEmbedResume(
+                        selectedSpotifyPodcast.embedUrl!,
+                        spotifyIframeResumeSeconds
+                      )}
+                    />
                   </div>
 
                   <button
@@ -967,7 +1064,7 @@ function DashboardContent() {
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </aside>
 
@@ -1677,6 +1774,83 @@ function DashboardContent() {
                   </div>
                 </section>
 
+                {recentSpotifyListens.length > 0 && (
+                  <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                        <Headphones className="size-5 text-[#1bd760]" />
+                        Recently listened
+                      </CardTitle>
+                      <p className="text-sm text-[#d6d0c6]/60">
+                        Resume where you left off. Progress is tracked in this browser while the
+                        player is active (approximate).
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {recentSpotifyListens.slice(0, 8).map((entry) => (
+                          <div
+                            key={entry.id}
+                            className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+                          >
+                            <div
+                              className="h-28 bg-[#141416] bg-cover bg-center"
+                              style={
+                                entry.imageUrl
+                                  ? { backgroundImage: `url(${entry.imageUrl})` }
+                                  : undefined
+                              }
+                            >
+                              <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/80 p-3">
+                                <Badge className="border border-white/10 bg-black/70 text-white hover:bg-black/70">
+                                  {entry.kind ?? "audio"}
+                                </Badge>
+                                <span className="rounded-full bg-[#b11226]/90 px-2.5 py-1.5 text-[0.65rem] font-bold text-white tabular-nums">
+                                  {formatVideoProgress(entry.progressSeconds)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-3 p-4">
+                              <div>
+                                <p className="line-clamp-2 text-sm font-bold text-[#f6f1e8]">
+                                  {entry.title}
+                                </p>
+                                <p className="mt-1 line-clamp-1 text-xs text-[#d6d0c6]/55">
+                                  {entry.publisher}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSection("spotify");
+                                    selectSpotifyAudio(entry, {
+                                      offsetSeconds: entry.progressSeconds,
+                                    });
+                                  }}
+                                  className="rounded-full bg-[#b11226] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f]"
+                                >
+                                  Resume
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSection("spotify");
+                                    selectSpotifyAudio(entry, { offsetSeconds: 0 });
+                                  }}
+                                  className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                                >
+                                  Start over
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <section className="min-w-0 space-y-5 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#0b0b0d] p-4 shadow-xl shadow-black/40 sm:p-5">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -1894,7 +2068,7 @@ function DashboardContent() {
                         <button
                           type="button"
                           onClick={() => {
-                            selectSpotifyAudio(item);
+                            selectSpotifyAudio(item, { offsetSeconds: 0 });
                             setAudioDrawerItem(null);
                           }}
                           className="self-start rounded-full bg-[#b11226] px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#8f0e1f] sm:self-center"
