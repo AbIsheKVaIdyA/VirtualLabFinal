@@ -55,45 +55,6 @@ const courseCategories = [
   "Career",
 ];
 
-const videoTopicSections = [
-  {
-    title: "Mixed Recommendations",
-    topic: "All",
-    description: "A small mix across programming, AI, cloud, security, and data.",
-    accent: "from-blue-600/25 to-white/[0.03]",
-  },
-  {
-    title: "Python Courses",
-    topic: "Python",
-    description: "Beginner-friendly Python basics, projects, and full courses.",
-    accent: "from-emerald-500/20 to-white/[0.03]",
-  },
-  {
-    title: "Cybersecurity Courses",
-    topic: "Cybersecurity",
-    description: "Security fundamentals, ethical hacking, and cyber career basics.",
-    accent: "from-red-500/20 to-white/[0.03]",
-  },
-  {
-    title: "Web Development",
-    topic: "Web Development",
-    description: "HTML, CSS, JavaScript, React, and full-stack learning paths.",
-    accent: "from-cyan-500/20 to-white/[0.03]",
-  },
-  {
-    title: "AI And Data",
-    topic: "AI",
-    description: "Artificial intelligence, machine learning, and applied AI courses.",
-    accent: "from-violet-500/20 to-white/[0.03]",
-  },
-  {
-    title: "Cloud And Career",
-    topic: "Cloud",
-    description: "Cloud computing, DevOps foundations, and job-ready skills.",
-    accent: "from-orange-500/20 to-white/[0.03]",
-  },
-];
-
 type SpotifyPodcast = {
   id: string;
   title: string;
@@ -215,7 +176,7 @@ const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
   return (
     <div
       className={cn(
-        "relative mx-auto h-[80px] min-h-[80px] w-full max-w-2xl min-w-0 overflow-hidden rounded-xl sm:rounded-2xl",
+        "relative h-[80px] min-h-[80px] w-full min-w-0 max-w-full overflow-hidden rounded-xl sm:mx-auto sm:max-w-2xl sm:rounded-2xl",
         "border border-white/[0.12] bg-[#070708]",
         "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_10px_28px_rgba(0,0,0,0.4)] ring-1 ring-white/[0.04]"
       )}
@@ -228,7 +189,7 @@ const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
         height="80"
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
-        className="absolute inset-0 h-full w-full border-0"
+        className="absolute inset-0 block h-full w-full max-w-full border-0"
       />
     </div>
   );
@@ -237,7 +198,6 @@ const SpotifyNavbarPlayer = memo(function SpotifyNavbarPlayer({
 function DashboardContent() {
   const { user: clerkUser } = useUser();
   const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [spotifyCategory, setSpotifyCategory] = useState("All");
   const [spotifyPodcasts, setSpotifyPodcasts] = useState<SpotifyPodcast[]>([]);
   const [selectedSpotifyPodcast, setSelectedSpotifyPodcast] = useState<SpotifyPodcast | null>(
     null
@@ -254,7 +214,6 @@ function DashboardContent() {
   const [recentSpotifyListens, setRecentSpotifyListens] = useState<SpotifyListenEntry[]>([]);
   /** Start offset (seconds) passed into Spotify embed URLs for resume-at-position. */
   const [spotifyIframeResumeSeconds, setSpotifyIframeResumeSeconds] = useState(0);
-  const [videoTopic, setVideoTopic] = useState("All");
   const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
   const [videosLoading, setVideosLoading] = useState(false);
@@ -286,20 +245,15 @@ function DashboardContent() {
         .includes(query)
     );
   }, [noteSearch, savedVideoNotes]);
-  const spotifyRows = useMemo(
-    () => {
-      const topicsToShow = spotifyCategory === "All" ? courseCategories : [spotifyCategory];
-
-      return topicsToShow
-        .map((topic) => ({
-          title: `${topic} Audio`,
-          subtitle: "English episodes, playlists, and shows for this topic.",
-          items: spotifyPodcasts.filter((item) => item.topic === topic),
-        }))
-        .filter((row) => row.items.length > 0);
-    },
-    [spotifyCategory, spotifyPodcasts]
-  );
+  const spotifyRows = useMemo(() => {
+    return courseCategories
+      .map((topic) => ({
+        title: `${topic} Audio`,
+        subtitle: "English episodes, playlists, and shows for this topic.",
+        items: spotifyPodcasts.filter((item) => item.topic === topic),
+      }))
+      .filter((row) => row.items.length > 0);
+  }, [spotifyPodcasts]);
   const selectedAudioIndex = selectedSpotifyPodcast
     ? spotifyPodcasts.findIndex((item) => item.id === selectedSpotifyPodcast.id)
     : -1;
@@ -708,7 +662,7 @@ function DashboardContent() {
     if (activeSection !== "videos") return;
 
     const controller = new AbortController();
-    const params = new URLSearchParams({ topic: videoTopic });
+    const params = new URLSearchParams({ topic: "All" });
 
     setVideosLoading(true);
     fetch(`/api/youtube/courses?${params.toString()}`, {
@@ -735,7 +689,7 @@ function DashboardContent() {
       .finally(() => setVideosLoading(false));
 
     return () => controller.abort();
-  }, [activeSection, videoTopic]);
+  }, [activeSection]);
 
   useEffect(() => {
     if (!selectedVideo || !noteStorageKey) {
@@ -879,7 +833,7 @@ function DashboardContent() {
     if (activeSection !== "spotify") return;
 
     const controller = new AbortController();
-    const params = new URLSearchParams({ category: spotifyCategory });
+    const params = new URLSearchParams({ category: "All" });
 
     queueMicrotask(() => setSpotifyLoading(true));
     fetch(`/api/spotify/educational-podcasts?${params.toString()}`, {
@@ -919,12 +873,12 @@ function DashboardContent() {
       .finally(() => setSpotifyLoading(false));
 
     return () => controller.abort();
-  }, [activeSection, spotifyCategory, spotifyConnection?.connected, lastSpotifyPodcast]);
+  }, [activeSection, spotifyConnection?.connected, lastSpotifyPodcast]);
 
   return (
     <div
       className={cn(
-        "relative min-h-dvh overflow-x-hidden transition-colors duration-700",
+        "relative isolate min-h-dvh w-full min-w-0 overflow-x-hidden transition-colors duration-700",
         activeSection === "spotify" && "bg-[#050505] text-white"
       )}
     >
@@ -937,10 +891,10 @@ function DashboardContent() {
         )}
       />
 
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 overflow-x-hidden px-3 py-4 sm:gap-6 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
+      <div className="mx-auto grid w-full min-w-0 max-w-[1600px] grid-cols-1 gap-4 overflow-x-hidden px-3 py-4 sm:gap-6 sm:px-4 sm:py-6 lg:gap-6 lg:px-8 lg:py-8">
         <aside
           className={cn(
-            "sticky top-2 z-30 rounded-2xl border border-border/70 bg-card/75 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/65 sm:top-4 sm:px-4 sm:py-3.5",
+            "sticky top-2 z-30 w-full max-w-full min-w-0 rounded-2xl border border-border/70 bg-card/75 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/65 sm:top-4 sm:px-4 sm:py-3.5",
             activeSection === "spotify" &&
               "border-white/10 bg-[#08080a]/85 text-white supports-[backdrop-filter]:bg-[#08080a]/75"
           )}
@@ -963,12 +917,12 @@ function DashboardContent() {
 
             <nav
               className={cn(
-                "flex gap-2 overflow-x-auto overscroll-x-contain pb-0.5 pt-px [-webkit-overflow-scrolling:touch]",
+                "flex flex-wrap gap-2 overflow-x-hidden sm:flex-nowrap sm:gap-2 sm:overflow-x-auto sm:overscroll-x-contain sm:pb-0.5 sm:pt-px sm:[-webkit-overflow-scrolling:touch]",
                 "[scrollbar-width:thin]",
                 "[&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/[0.12] [&::-webkit-scrollbar-track]:bg-transparent",
                 activeSection !== "spotify" &&
                   "[&::-webkit-scrollbar-thumb]:bg-foreground/[0.12]",
-                "snap-x snap-mandatory"
+                "sm:snap-x sm:snap-mandatory"
               )}
             >
               {navSections.map((section) => {
@@ -980,7 +934,7 @@ function DashboardContent() {
                     type="button"
                     onClick={() => setActiveSection(section.id)}
                     className={cn(
-                      "flex shrink-0 snap-start items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-all sm:text-sm",
+                      "flex shrink-0 items-center gap-2 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-all min-[400px]:px-3 min-[400px]:py-2 min-[400px]:text-xs sm:snap-start sm:text-sm",
                       active
                         ? activeSection === "spotify"
                           ? "bg-[#b11226] text-white shadow-lg shadow-[#b11226]/25"
@@ -992,7 +946,7 @@ function DashboardContent() {
                     )}
                   >
                     <Icon className="size-4 shrink-0" />
-                    <span className="whitespace-nowrap">{section.label}</span>
+                    <span className="break-words sm:whitespace-nowrap">{section.label}</span>
                   </button>
                 );
               })}
@@ -1022,23 +976,8 @@ function DashboardContent() {
                   )}
                 </div>
 
-                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-                  <button
-                    type="button"
-                    onClick={selectPreviousSpotifyItem}
-                    className={cn(
-                      "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97]",
-                      activeSection === "spotify"
-                        ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
-                        : "border-border/80 bg-background/70 hover:bg-muted/80",
-                      spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
-                    )}
-                    aria-label="Previous Spotify item"
-                  >
-                    <SkipBack className="size-4" />
-                  </button>
-
-                  <div className="min-w-0 flex-1 px-px">
+                <div className="grid w-full min-w-0 gap-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:gap-2 md:gap-3">
+                  <div className="col-span-full min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1">
                     <SpotifyNavbarPlayer
                       title={selectedSpotifyPodcast.title}
                       embedUrl={withSpotifyEmbedResume(
@@ -1048,27 +987,43 @@ function DashboardContent() {
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={selectNextSpotifyItem}
-                    className={cn(
-                      "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97]",
-                      activeSection === "spotify"
-                        ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
-                        : "border-border/80 bg-background/70 hover:bg-muted/80",
-                      spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
-                    )}
-                    aria-label="Next Spotify item"
-                  >
-                    <SkipForward className="size-4" />
-                  </button>
+                  <div className="col-span-full flex justify-center gap-8 sm:contents">
+                    <button
+                      type="button"
+                      onClick={selectPreviousSpotifyItem}
+                      className={cn(
+                        "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97] sm:col-start-1 sm:row-start-1",
+                        activeSection === "spotify"
+                          ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
+                          : "border-border/80 bg-background/70 hover:bg-muted/80",
+                        spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
+                      )}
+                      aria-label="Previous Spotify item"
+                    >
+                      <SkipBack className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={selectNextSpotifyItem}
+                      className={cn(
+                        "shrink-0 rounded-full border p-2 transition-colors active:scale-[0.97] sm:col-start-3 sm:row-start-1",
+                        activeSection === "spotify"
+                          ? "border-white/12 bg-white/[0.06] hover:bg-white/12"
+                          : "border-border/80 bg-background/70 hover:bg-muted/80",
+                        spotifyPodcasts.length === 0 && "pointer-events-none opacity-40"
+                      )}
+                      aria-label="Next Spotify item"
+                    >
+                      <SkipForward className="size-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
           </div>
         </aside>
 
-        <main className="min-w-0 space-y-4 overflow-x-hidden lg:space-y-6">
+        <main className="min-w-0 max-w-full space-y-4 overflow-x-hidden lg:space-y-6">
           <div
             className={cn(
               "min-w-0 space-y-4 overflow-x-hidden rounded-2xl border bg-card/60 p-3 animate-in fade-in duration-300 sm:p-4",
@@ -1085,15 +1040,15 @@ function DashboardContent() {
                   {availableCourses.map((course) => (
                     <div
                       key={course.name}
-                      className="rounded-xl border bg-background/70 p-5"
+                      className="min-w-0 overflow-hidden rounded-xl border bg-background/70 p-5"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="rounded-lg bg-primary/15 p-2 text-primary">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="shrink-0 rounded-lg bg-primary/15 p-2 text-primary">
                           <BookOpenText className="size-5" />
                         </span>
-                        <p className="font-semibold">{course.name}</p>
+                        <p className="min-w-0 break-words font-semibold">{course.name}</p>
                       </div>
-                      <p className="mt-3 text-sm text-muted-foreground">
+                      <p className="mt-3 break-words text-sm text-muted-foreground">
                         {course.description}
                       </p>
                     </div>
@@ -1289,9 +1244,6 @@ function DashboardContent() {
                   <>
                     <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.28),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-6">
                       <div className="space-y-5">
-                        <Badge className="w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
-                          YouTube course finder
-                        </Badge>
                         <div>
                           <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
                             Pick a course, then open your study room.
@@ -1299,26 +1251,6 @@ function DashboardContent() {
                           <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
                             The selected video opens in a focused layout with the player on the left and notes on the right.
                           </p>
-                        </div>
-                        <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-                          {["All", ...courseCategories].map((topic) => (
-                            <button
-                              key={`video-${topic}`}
-                              type="button"
-                              onClick={() => {
-                                setVideoTopic(topic);
-                                setVideoStudioOpen(false);
-                              }}
-                              className={cn(
-                                "shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition-all",
-                                videoTopic === topic
-                                  ? "border-blue-500 bg-blue-600 text-white"
-                                  : "border-white/15 bg-black/40 text-[#d6d0c6] hover:border-blue-400/50 hover:bg-white/5"
-                              )}
-                            >
-                              {topic}
-                            </button>
-                          ))}
                         </div>
                         {videosMessage && (
                           <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-[#d6d0c6]/70">
@@ -1396,58 +1328,14 @@ function DashboardContent() {
                       </Card>
                     )}
 
-                    <section className="space-y-3">
-                      <div>
-                        <h3 className="text-lg font-black text-[#f6f1e8]">
-                          Pick a recommendation section
-                        </h3>
-                        <p className="text-sm text-[#d6d0c6]/60">
-                          Each section loads only 3 YouTube videos to keep API usage low.
-                        </p>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {videoTopicSections.map((section) => {
-                          const active = videoTopic === section.topic;
-
-                          return (
-                            <button
-                              key={section.topic}
-                              type="button"
-                              onClick={() => {
-                                setVideoTopic(section.topic);
-                                setVideoStudioOpen(false);
-                              }}
-                              className={cn(
-                                "rounded-2xl border bg-gradient-to-br p-4 text-left transition-all hover:-translate-y-1 hover:border-blue-400/60",
-                                section.accent,
-                                active
-                                  ? "border-blue-500 shadow-lg shadow-blue-500/20"
-                                  : "border-white/10"
-                              )}
-                            >
-                              <Badge className="border border-white/10 bg-black/35 text-white hover:bg-black/35">
-                                3 videos
-                              </Badge>
-                              <p className="mt-3 font-bold text-[#f6f1e8]">
-                                {section.title}
-                              </p>
-                              <p className="mt-2 text-sm leading-relaxed text-[#d6d0c6]/60">
-                                {section.description}
-                              </p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </section>
-
                     <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
                           <Search className="size-5 text-blue-300" />
-                          {videoTopic} Recommendations
+                          Recommended courses
                         </CardTitle>
                         <p className="text-sm text-[#d6d0c6]/60">
-                          Showing only 3 videos for this section.
+                          A small set of videos per load to keep API usage low.
                         </p>
                       </CardHeader>
                       <CardContent>
@@ -1509,7 +1397,7 @@ function DashboardContent() {
                           </div>
                         ) : (
                           <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
-                            No videos loaded yet. Check that `YOUTUBE_API_KEY` is set, then try another topic.
+                            No videos loaded yet. Check that `YOUTUBE_API_KEY` is configured, then reload.
                           </div>
                         )}
                       </CardContent>
@@ -1720,7 +1608,7 @@ function DashboardContent() {
                           Study audio for every session.
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
-                          Pick a topic, choose an episode or playlist, and control playback from the navbar.
+                          Choose an episode or playlist from the rows below and control playback from the navbar.
                         </p>
                       </div>
                       <div className="rounded-2xl border border-green-400/30 bg-green-500/10 px-4 py-3 text-xs font-semibold text-green-100">
@@ -1729,23 +1617,6 @@ function DashboardContent() {
                           ? ` · ${spotifyConnection.profile.product}`
                           : ""}
                       </div>
-                    </div>
-                    <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-                      {["All", ...courseCategories].map((category) => (
-                        <button
-                          key={`spotify-${category}`}
-                          type="button"
-                          onClick={() => setSpotifyCategory(category)}
-                          className={cn(
-                            "shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition-all",
-                            spotifyCategory === category
-                              ? "border-[#b11226] bg-[#b11226] text-white"
-                              : "border-white/15 bg-black/40 text-[#d6d0c6] hover:border-[#b11226]/50 hover:bg-white/5"
-                          )}
-                        >
-                          {category}
-                        </button>
-                      ))}
                     </div>
                     {(selectedSpotifyPodcast || lastSpotifyPodcast) && (
                       <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/30 p-3">
@@ -1860,7 +1731,7 @@ function DashboardContent() {
                       </p>
                     </div>
                     <Badge className="border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
-                      {spotifyCategory}
+                      Recommended
                     </Badge>
                   </div>
                   {spotifyMessage && (
@@ -1873,7 +1744,7 @@ function DashboardContent() {
                       {[1, 2, 3, 4].map((item) => (
                         <div
                           key={item}
-                          className="h-64 min-h-48 min-w-[min(16rem,calc(100dvw-2.5rem))] max-w-[min(16rem,calc(100dvw-2.5rem))] shrink-0 animate-pulse snap-start rounded-2xl bg-white/10"
+                          className="h-64 min-h-48 min-w-[min(16rem,calc(100vw-3rem))] max-w-[min(16rem,calc(100vw-3rem))] shrink-0 animate-pulse snap-start rounded-2xl bg-white/10"
                         />
                       ))}
                     </div>
@@ -1883,8 +1754,7 @@ function DashboardContent() {
                         No playable Spotify audio loaded yet.
                       </p>
                       <p className="mt-2">
-                        Try another topic filter. If this keeps happening,
-                        reconnect Spotify.
+                        If this keeps happening, reconnect Spotify or try again later.
                       </p>
                     </div>
                   ) : (
@@ -1906,7 +1776,7 @@ function DashboardContent() {
                                 onClick={() => handleSpotifyCardClick(podcast)}
                                 className={cn(
                                   "group shrink-0 snap-start overflow-hidden rounded-2xl border bg-[#111113] text-left transition-all hover:-translate-y-1 hover:bg-[#171719]",
-                                  "min-h-48 min-w-[min(16rem,calc(100dvw-2.5rem))] max-w-[min(16rem,calc(100dvw-2.5rem))]",
+                                  "min-h-48 w-[min(16rem,calc(100vw-3rem))] max-w-[min(16rem,calc(100vw-3rem))] shrink-0 sm:w-64 sm:max-w-[16rem]",
                                   selected
                                     ? "border-[#b11226] shadow-lg shadow-[#b11226]/20"
                                     : "border-white/10"

@@ -42,10 +42,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} ${plusJakartaSans.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} ${plusJakartaSans.variable} h-full w-full overflow-x-hidden antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-dvh flex-col">
+      <body className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden">
         <ClerkProvider>
           <ThemeProvider>
             {children}

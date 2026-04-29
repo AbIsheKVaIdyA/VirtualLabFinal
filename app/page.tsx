@@ -82,7 +82,7 @@ const dashboardPreview = [
 
 export default function Home() {
   return (
-    <div className="relative overflow-x-hidden bg-background">
+    <div className="relative min-w-0 w-full overflow-x-hidden bg-background">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,color-mix(in_oklab,var(--primary)_34%,transparent),transparent_36%),radial-gradient(circle_at_85%_8%,color-mix(in_oklab,var(--accent)_28%,transparent),transparent_34%)]" />
       <main className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-10 lg:gap-14 lg:px-10">
         <header className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

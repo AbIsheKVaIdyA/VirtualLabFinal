@@ -67,7 +67,7 @@ export function CommunityWorkspace({
   return (
     <section
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-3 overflow-hidden",
+        "flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-visible",
         className
       )}
     >
@@ -115,8 +115,8 @@ export function CommunityWorkspace({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="grid min-h-[420px] overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#08080a_0%,#050506_100%)] shadow-2xl shadow-black/35 sm:rounded-3xl md:min-h-[min(calc(100dvh-10rem),900px)] md:grid-cols-[80px_288px_minmax(0,1fr)] lg:grid-cols-[80px_290px_minmax(0,1fr)]">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-3 overflow-x-hidden lg:grid-cols-[minmax(0,1fr)_minmax(260px,320px)] lg:gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-[420px] min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#08080a_0%,#050506_100%)] shadow-2xl shadow-black/35 sm:rounded-3xl md:min-h-[min(calc(100dvh-10rem),900px)] md:grid-cols-[80px_288px_minmax(0,1fr)] lg:grid-cols-[80px_290px_minmax(0,1fr)]">
           <ServerSidebar
             servers={seed.servers}
             activeServerId={activeServerId}

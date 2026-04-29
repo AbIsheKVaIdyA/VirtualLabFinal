@@ -122,7 +122,9 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply min-w-0 overflow-x-clip bg-background text-foreground font-normal;
+    @apply min-w-0 overflow-x-hidden bg-background font-normal text-foreground;
+    width: 100%;
+    max-width: 100%;
     /* Horizontal inset for curved / notched phones (combines with app padding) */
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
@@ -133,7 +135,10 @@
   }
   html {
     @apply font-sans;
-    overflow-x: clip;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     min-height: 100%;
   }
   h1,
@@ -144,5 +149,14 @@
   }
   h1 {
     @apply text-balance;
+  }
+
+  /*
+   * Prevent incidental horizontal scroll from wide tokens/URLs in flex layouts,
+   * especially on mobile Safari.
+   */
+  :where(p, li, dd, caption, td) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
