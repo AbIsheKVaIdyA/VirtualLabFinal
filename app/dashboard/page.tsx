@@ -1,17 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenText,
+  CheckSquare,
+  Clock3,
+  Code2,
   Disc3,
+  Download,
+  FileText,
   Link2,
   ListMusic,
+  NotebookPen,
   PlayCircle,
   Podcast,
+  Save,
+  Search,
   SkipBack,
   SkipForward,
   Square,
+  Video,
   X,
 } from "lucide-react";
 
@@ -44,6 +54,45 @@ const courseCategories = [
   "Career",
 ];
 
+const videoTopicSections = [
+  {
+    title: "Mixed Recommendations",
+    topic: "All",
+    description: "A small mix across programming, AI, cloud, security, and data.",
+    accent: "from-blue-600/25 to-white/[0.03]",
+  },
+  {
+    title: "Python Courses",
+    topic: "Python",
+    description: "Beginner-friendly Python basics, projects, and full courses.",
+    accent: "from-emerald-500/20 to-white/[0.03]",
+  },
+  {
+    title: "Cybersecurity Courses",
+    topic: "Cybersecurity",
+    description: "Security fundamentals, ethical hacking, and cyber career basics.",
+    accent: "from-red-500/20 to-white/[0.03]",
+  },
+  {
+    title: "Web Development",
+    topic: "Web Development",
+    description: "HTML, CSS, JavaScript, React, and full-stack learning paths.",
+    accent: "from-cyan-500/20 to-white/[0.03]",
+  },
+  {
+    title: "AI And Data",
+    topic: "AI",
+    description: "Artificial intelligence, machine learning, and applied AI courses.",
+    accent: "from-violet-500/20 to-white/[0.03]",
+  },
+  {
+    title: "Cloud And Career",
+    topic: "Cloud",
+    description: "Cloud computing, DevOps foundations, and job-ready skills.",
+    accent: "from-orange-500/20 to-white/[0.03]",
+  },
+];
+
 type SpotifyPodcast = {
   id: string;
   title: string;
@@ -70,17 +119,55 @@ type SpotifyConnection = {
   message?: string;
 };
 
-type SectionId = "courses" | "spotify" | "community";
+type LearningVideo = {
+  id: string;
+  title: string;
+  description: string;
+  channelTitle: string;
+  thumbnailUrl: string | null;
+  embedUrl: string;
+  youtubeUrl: string;
+  topic: string;
+};
+
+type SavedVideoNote = {
+  videoId: string;
+  videoTitle: string;
+  topic: string;
+  content: string;
+  updatedAt: string;
+};
+
+type NoteHistoryEntry = {
+  id: string;
+  content: string;
+  createdAt: string;
+};
+
+type RecentLearningVideo = LearningVideo & {
+  progressSeconds: number;
+  updatedAt: string;
+};
+
+type SectionId = "courses" | "videos" | "notes" | "spotify" | "community";
 
 const SPOTIFY_LAST_AUDIO_KEY = "vl:last-spotify-audio";
+const VIDEO_NOTE_KEY_PREFIX = "vl:video-note:";
+const VIDEO_NOTE_INDEX_KEY = "vl:video-note-index";
+const VIDEO_NOTE_HISTORY_KEY_PREFIX = "vl:video-note-history:";
+const RECENT_VIDEO_KEY = "vl:recent-learning-videos";
 
 const navSections: Array<{ id: SectionId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
   { id: "courses", label: "My Courses", icon: BookOpenText },
+  { id: "videos", label: "Learning Videos", icon: Video },
+  { id: "notes", label: "Notes", icon: FileText },
   { id: "spotify", label: "Spotify Podcasts", icon: Podcast },
   { id: "community", label: "Community", icon: Disc3 },
 ];
 
 function DashboardContent() {
+  const { user: clerkUser } = useUser();
+  const noteTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [spotifyCategory, setSpotifyCategory] = useState("All");
   const [spotifyPodcasts, setSpotifyPodcasts] = useState<SpotifyPodcast[]>([]);
   const [selectedSpotifyPodcast, setSelectedSpotifyPodcast] = useState<SpotifyPodcast | null>(
@@ -93,7 +180,35 @@ function DashboardContent() {
   const [audioDrawerItems, setAudioDrawerItems] = useState<SpotifyPodcast[]>([]);
   const [audioDrawerLoading, setAudioDrawerLoading] = useState(false);
   const [lastSpotifyPodcast, setLastSpotifyPodcast] = useState<SpotifyPodcast | null>(null);
+  const [videoTopic, setVideoTopic] = useState("All");
+  const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosMessage, setVideosMessage] = useState<string | null>(null);
+  const [videoNote, setVideoNote] = useState("");
+  const [noteStatus, setNoteStatus] = useState<string | null>(null);
+  const [videoStudioOpen, setVideoStudioOpen] = useState(false);
+  const [noteSearch, setNoteSearch] = useState("");
+  const [savedVideoNotes, setSavedVideoNotes] = useState<SavedVideoNote[]>([]);
+  const [noteHistory, setNoteHistory] = useState<NoteHistoryEntry[]>([]);
+  const [studyStartedAt, setStudyStartedAt] = useState<number | null>(null);
+  const [videoStartSeconds, setVideoStartSeconds] = useState(0);
+  const [recentLearningVideos, setRecentLearningVideos] = useState<RecentLearningVideo[]>([]);
   const [activeSection, setActiveSection] = useState<SectionId>("courses");
+  const noteStorageKey = selectedVideo
+    ? `${VIDEO_NOTE_KEY_PREFIX}${clerkUser?.id ?? "guest"}:${selectedVideo.id}`
+    : null;
+  const noteHistoryKey = selectedVideo
+    ? `${VIDEO_NOTE_HISTORY_KEY_PREFIX}${clerkUser?.id ?? "guest"}:${selectedVideo.id}`
+    : null;
+  const filteredSavedVideoNotes = useMemo(() => {
+    const query = noteSearch.trim().toLowerCase();
+    if (!query) return savedVideoNotes;
+
+    return savedVideoNotes.filter((note) =>
+      `${note.videoTitle} ${note.topic} ${note.content}`.toLowerCase().includes(query)
+    );
+  }, [noteSearch, savedVideoNotes]);
   const spotifyRows = useMemo(
     () => {
       const topicsToShow = spotifyCategory === "All" ? courseCategories : [spotifyCategory];
@@ -139,6 +254,43 @@ function DashboardContent() {
       selectedAudioIndex > 0 ? selectedAudioIndex - 1 : spotifyPodcasts.length - 1;
     selectSpotifyAudio(spotifyPodcasts[previousIndex]);
   };
+  const readRecentLearningVideos = () => {
+    try {
+      return JSON.parse(window.localStorage.getItem(RECENT_VIDEO_KEY) ?? "[]") as RecentLearningVideo[];
+    } catch {
+      window.localStorage.removeItem(RECENT_VIDEO_KEY);
+      return [];
+    }
+  };
+  const writeRecentLearningVideos = (videos: RecentLearningVideo[]) => {
+    const nextVideos = videos.slice(0, 8);
+    window.localStorage.setItem(RECENT_VIDEO_KEY, JSON.stringify(nextVideos));
+    setRecentLearningVideos(nextVideos);
+  };
+  const formatVideoProgress = (seconds: number) => {
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainingSeconds = (safeSeconds % 60).toString().padStart(2, "0");
+
+    return `${minutes}:${remainingSeconds}`;
+  };
+  const getRecentProgress = (videoId: string) =>
+    recentLearningVideos.find((video) => video.id === videoId)?.progressSeconds ?? 0;
+  const openVideoStudyRoom = (video: LearningVideo, resume = true) => {
+    const progressSeconds = resume ? getRecentProgress(video.id) : 0;
+    setSelectedVideo(video);
+    setVideoStartSeconds(progressSeconds);
+    setStudyStartedAt(Date.now());
+    setVideoStudioOpen(true);
+    writeRecentLearningVideos([
+      {
+        ...video,
+        progressSeconds,
+        updatedAt: new Date().toISOString(),
+      },
+      ...readRecentLearningVideos().filter((recentVideo) => recentVideo.id !== video.id),
+    ]);
+  };
   const openAudioDetails = (item: SpotifyPodcast) => {
     setAudioDrawerItem(item);
     setAudioDrawerItems(item.kind === "episode" || item.kind === "track" ? [item] : []);
@@ -181,6 +333,313 @@ function DashboardContent() {
       window.localStorage.removeItem(SPOTIFY_LAST_AUDIO_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    setRecentLearningVideos(readRecentLearningVideos());
+  }, []);
+
+  const readLocalNoteIndex = () => {
+    try {
+      return JSON.parse(window.localStorage.getItem(VIDEO_NOTE_INDEX_KEY) ?? "[]") as SavedVideoNote[];
+    } catch {
+      window.localStorage.removeItem(VIDEO_NOTE_INDEX_KEY);
+      return [];
+    }
+  };
+
+  const refreshLocalNoteIndex = () => {
+    setSavedVideoNotes(readLocalNoteIndex());
+  };
+
+  const saveLocalNote = (content: string) => {
+    if (!selectedVideo || !noteStorageKey) return;
+
+    const updatedAt = new Date().toISOString();
+    window.localStorage.setItem(noteStorageKey, content);
+    const nextIndex = [
+      {
+        videoId: selectedVideo.id,
+        videoTitle: selectedVideo.title,
+        topic: selectedVideo.topic,
+        content,
+        updatedAt,
+      },
+      ...readLocalNoteIndex().filter((note) => note.videoId !== selectedVideo.id),
+    ];
+
+    window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(nextIndex));
+    setSavedVideoNotes(nextIndex);
+  };
+
+  const readLocalHistory = () => {
+    if (!noteHistoryKey) return [];
+
+    try {
+      return JSON.parse(window.localStorage.getItem(noteHistoryKey) ?? "[]") as NoteHistoryEntry[];
+    } catch {
+      window.localStorage.removeItem(noteHistoryKey);
+      return [];
+    }
+  };
+
+  const writeLocalHistory = (history: NoteHistoryEntry[]) => {
+    if (!noteHistoryKey) return;
+
+    window.localStorage.setItem(noteHistoryKey, JSON.stringify(history.slice(0, 8)));
+    setNoteHistory(history.slice(0, 8));
+  };
+
+  const formatStudyTimestamp = () => {
+    const elapsedSeconds = Math.max(
+      0,
+      Math.floor((Date.now() - (studyStartedAt ?? Date.now())) / 1000)
+    );
+    const minutes = Math.floor(elapsedSeconds / 60).toString();
+    const seconds = (elapsedSeconds % 60).toString().padStart(2, "0");
+
+    return `${minutes}:${seconds}`;
+  };
+
+  const insertIntoNote = (text: string) => {
+    const textarea = noteTextareaRef.current;
+    if (!textarea) {
+      setVideoNote((current) => `${current}${current ? "\n" : ""}${text}`);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const nextValue = `${videoNote.slice(0, start)}${text}${videoNote.slice(end)}`;
+    setVideoNote(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    });
+  };
+
+  const wrapSelectedNoteText = (before: string, after = "") => {
+    const textarea = noteTextareaRef.current;
+    if (!textarea) {
+      insertIntoNote(before + after);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = videoNote.slice(start, end) || "important concept";
+    const nextText = `${before}${selected}${after}`;
+    const nextValue = `${videoNote.slice(0, start)}${nextText}${videoNote.slice(end)}`;
+    setVideoNote(nextValue);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, start + before.length + selected.length);
+    });
+  };
+
+  const createNoteSnapshot = () => {
+    if (!selectedVideo || !videoNote.trim()) return;
+
+    const entry = {
+      id: `${selectedVideo.id}-${Date.now()}`,
+      content: videoNote,
+      createdAt: new Date().toISOString(),
+    };
+    const history = [entry, ...readLocalHistory()];
+    writeLocalHistory(history);
+    saveLocalNote(videoNote);
+    setNoteStatus("Snapshot saved.");
+
+    fetch("/api/video-notes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        videoId: selectedVideo.id,
+        videoTitle: selectedVideo.title,
+        topic: selectedVideo.topic,
+        content: videoNote,
+        createSnapshot: true,
+      }),
+    }).catch(() => undefined);
+  };
+
+  const exportNoteMarkdown = () => {
+    if (!selectedVideo) return;
+
+    const markdown = `# ${selectedVideo.title}\n\nTopic: ${selectedVideo.topic}\nChannel: ${selectedVideo.channelTitle}\n\n${videoNote}`;
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedVideo.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-notes.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportNotePdf = () => {
+    if (!selectedVideo) return;
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${selectedVideo.title} notes</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 32px; line-height: 1.55; }
+            pre { white-space: pre-wrap; font-family: inherit; }
+          </style>
+        </head>
+        <body>
+          <h1>${selectedVideo.title}</h1>
+          <p>${selectedVideo.topic} · ${selectedVideo.channelTitle}</p>
+          <pre>${videoNote.replace(/[<>&]/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[char] ?? char)}</pre>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  useEffect(() => {
+    if (activeSection !== "videos") return;
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({ topic: videoTopic });
+
+    setVideosLoading(true);
+    fetch(`/api/youtube/courses?${params.toString()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => res.json())
+      .then((data: { message?: string; videos?: LearningVideo[] }) => {
+        const videos = data.videos ?? [];
+        setLearningVideos(videos);
+        setSelectedVideo((current) =>
+          current && videos.some((video) => video.id === current.id)
+            ? current
+            : videos[0] ?? null
+        );
+        setVideosMessage(data.message ?? "YouTube course videos loaded.");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLearningVideos([]);
+        setSelectedVideo(null);
+        setVideosMessage("Could not load YouTube videos right now.");
+      })
+      .finally(() => setVideosLoading(false));
+
+    return () => controller.abort();
+  }, [activeSection, videoTopic]);
+
+  useEffect(() => {
+    if (!selectedVideo || !noteStorageKey) {
+      setVideoNote("");
+      setNoteStatus(null);
+      setNoteHistory([]);
+      return;
+    }
+
+    setStudyStartedAt(Date.now());
+    const localNote = window.localStorage.getItem(noteStorageKey) ?? "";
+    setVideoNote(localNote);
+    setNoteHistory(readLocalHistory());
+    setNoteStatus(localNote ? "Loaded saved note from this browser." : null);
+
+    fetch(`/api/video-notes?videoId=${encodeURIComponent(selectedVideo.id)}`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data: { note?: string; history?: NoteHistoryEntry[]; persisted?: boolean }) => {
+        if (data.history?.length) {
+          writeLocalHistory(data.history);
+        }
+
+        if (!data.note) return;
+        setVideoNote(data.note);
+        saveLocalNote(data.note);
+        setNoteStatus(data.persisted ? "Loaded saved note." : "Loaded local note.");
+      })
+      .catch(() => {
+        if (localNote) setNoteStatus("Loaded local note.");
+      });
+  }, [noteHistoryKey, noteStorageKey, selectedVideo]);
+
+  useEffect(() => {
+    if (!videoStudioOpen || !selectedVideo || !studyStartedAt) return;
+
+    const interval = window.setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - studyStartedAt) / 1000);
+      const progressSeconds = videoStartSeconds + elapsedSeconds;
+      writeRecentLearningVideos([
+        {
+          ...selectedVideo,
+          progressSeconds,
+          updatedAt: new Date().toISOString(),
+        },
+        ...readRecentLearningVideos().filter((recentVideo) => recentVideo.id !== selectedVideo.id),
+      ]);
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [selectedVideo, studyStartedAt, videoStartSeconds, videoStudioOpen]);
+
+  useEffect(() => {
+    refreshLocalNoteIndex();
+
+    fetch("/api/video-notes", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data: { notes?: SavedVideoNote[] }) => {
+        if (!data.notes?.length) return;
+
+        const merged = [
+          ...data.notes,
+          ...readLocalNoteIndex().filter(
+            (localNote) => !data.notes?.some((remoteNote) => remoteNote.videoId === localNote.videoId)
+          ),
+        ];
+        window.localStorage.setItem(VIDEO_NOTE_INDEX_KEY, JSON.stringify(merged));
+        setSavedVideoNotes(merged);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedVideo || !noteStorageKey) return;
+    if (!videoStudioOpen) return;
+
+    saveLocalNote(videoNote);
+    setNoteStatus("Autosaving...");
+    const timeout = window.setTimeout(() => {
+      fetch("/api/video-notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          videoId: selectedVideo.id,
+          videoTitle: selectedVideo.title,
+          topic: selectedVideo.topic,
+          content: videoNote,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data: { persisted?: boolean; saved?: boolean }) => {
+          setNoteStatus(
+            data.persisted && data.saved
+              ? "Autosaved to your account."
+              : "Autosaved in this browser."
+          );
+        })
+        .catch(() => setNoteStatus("Autosaved in this browser."));
+    }, 900);
+
+    return () => window.clearTimeout(timeout);
+  }, [noteStorageKey, selectedVideo, videoNote, videoStudioOpen]);
 
   useEffect(() => {
     if (activeSection !== "spotify") return;
@@ -277,16 +736,8 @@ function DashboardContent() {
         >
           <div className="grid gap-3 lg:grid-cols-[auto_1fr_auto] lg:items-center">
             <div className="flex min-w-0 items-center gap-3">
-              <span
-                className={cn(
-                  "rounded-xl bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground",
-                  activeSection === "spotify" && "bg-[#b11226] text-white"
-                )}
-              >
-                VL
-              </span>
               <div>
-                <p className="text-sm font-semibold">Virtual Lab</p>
+                <p className="text-sm font-semibold">UpSkillr</p>
                 <p className="hidden text-xs text-muted-foreground sm:block">Student Workspace</p>
               </div>
             </div>
@@ -419,6 +870,532 @@ function DashboardContent() {
               </Card>
             )}
 
+            {activeSection === "videos" && (
+              <div className="-m-3 min-w-0 space-y-4 overflow-x-hidden rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
+                {videoStudioOpen && selectedVideo ? (
+                  <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-5">
+                      <div className="min-w-0">
+                        <Badge className="mb-3 w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
+                          Study room
+                        </Badge>
+                        <h2 className="line-clamp-2 text-2xl font-black tracking-tight sm:text-3xl">
+                          {selectedVideo.title}
+                        </h2>
+                        <p className="mt-1 text-sm text-[#d6d0c6]/60">
+                          {selectedVideo.channelTitle} · {selectedVideo.topic}
+                        </p>
+                        {videoStartSeconds > 0 && (
+                          <p className="mt-2 text-xs font-semibold text-blue-200">
+                            Resuming from {formatVideoProgress(videoStartSeconds)}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setVideoStudioOpen(false)}
+                        className="rounded-full border border-white/15 bg-white/[0.04] px-4 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                      >
+                        Back to videos
+                      </button>
+                    </div>
+
+                    <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
+                      <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                            <Video className="size-5 text-blue-300" />
+                            Video
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <iframe
+                            title={`YouTube player for ${selectedVideo.title}`}
+                            src={`${selectedVideo.embedUrl}?rel=0&modestbranding=1&start=${Math.floor(
+                              videoStartSeconds
+                            )}`}
+                            width="100%"
+                            height="520"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                            loading="lazy"
+                            className="aspect-video h-auto min-h-[240px] rounded-2xl border-0 bg-black xl:min-h-[520px]"
+                          />
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                            <NotebookPen className="size-5 text-blue-300" />
+                            Notes
+                          </CardTitle>
+                          <p className="line-clamp-2 text-sm text-[#d6d0c6]/60">
+                            Write notes while the video plays beside this panel.
+                          </p>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => wrapSelectedNoteText("## ")}
+                              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] hover:bg-white/10"
+                            >
+                              H2
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => insertIntoNote("\n- ")}
+                              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] hover:bg-white/10"
+                            >
+                              Bullet
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => insertIntoNote("\n- [ ] ")}
+                              className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] hover:bg-white/10"
+                            >
+                              <CheckSquare className="mr-1.5 size-3.5" />
+                              Task
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => wrapSelectedNoteText("\n```\n", "\n```\n")}
+                              className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] hover:bg-white/10"
+                            >
+                              <Code2 className="mr-1.5 size-3.5" />
+                              Code
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                insertIntoNote(`\n[${formatStudyTimestamp()}] important concept - `)
+                              }
+                              className="inline-flex items-center rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-2 text-xs font-bold text-blue-100 hover:bg-blue-500/25"
+                            >
+                              <Clock3 className="mr-1.5 size-3.5" />
+                              Timestamp
+                            </button>
+                          </div>
+                          <textarea
+                            ref={noteTextareaRef}
+                            value={videoNote}
+                            onChange={(event) => setVideoNote(event.target.value)}
+                            placeholder="Write key concepts, timestamps, doubts, and practice tasks..."
+                            className="min-h-[320px] w-full resize-none rounded-2xl border border-white/10 bg-black/35 p-4 text-sm text-[#f6f1e8] outline-none transition-colors placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60 xl:min-h-[520px]"
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs text-[#d6d0c6]/55">
+                              {noteStatus ?? "Autosave is ready for this video."}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={createNoteSnapshot}
+                                className="inline-flex items-center rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
+                              >
+                                <Save className="mr-2 size-4" />
+                                Save snapshot
+                              </button>
+                              <button
+                                type="button"
+                                onClick={exportNoteMarkdown}
+                                className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                              >
+                                <Download className="mr-2 size-4" />
+                                Markdown
+                              </button>
+                              <button
+                                type="button"
+                                onClick={exportNotePdf}
+                                className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                              >
+                                <FileText className="mr-2 size-4" />
+                                PDF
+                              </button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                      <Card className="border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                            <NotebookPen className="size-5 text-blue-300" />
+                            History
+                          </CardTitle>
+                          <p className="text-sm text-[#d6d0c6]/60">
+                            Snapshots for this video.
+                          </p>
+                        </CardHeader>
+                        <CardContent className="grid max-h-72 gap-2 overflow-y-auto">
+                          {noteHistory.length ? (
+                            noteHistory.map((entry) => (
+                              <button
+                                key={entry.id}
+                                type="button"
+                                onClick={() => {
+                                  setVideoNote(entry.content);
+                                  setNoteStatus("Restored note snapshot.");
+                                }}
+                                className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:bg-white/[0.07]"
+                              >
+                                <p className="text-xs font-bold text-blue-200">
+                                  {new Date(entry.createdAt).toLocaleString()}
+                                </p>
+                                <p className="mt-2 line-clamp-3 text-xs text-[#d6d0c6]/65">
+                                  {entry.content}
+                                </p>
+                              </button>
+                            ))
+                          ) : (
+                            <p className="rounded-2xl border border-dashed border-white/15 p-4 text-sm text-[#d6d0c6]/60">
+                              Use Save snapshot to keep versions while autosave handles the latest note.
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                  </section>
+                ) : (
+                  <>
+                    <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.28),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-6">
+                      <div className="space-y-5">
+                        <Badge className="w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
+                          YouTube course finder
+                        </Badge>
+                        <div>
+                          <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
+                            Pick a course, then open your study room.
+                          </h2>
+                          <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
+                            The selected video opens in a focused layout with the player on the left and notes on the right.
+                          </p>
+                        </div>
+                        <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                          {["All", ...courseCategories].map((topic) => (
+                            <button
+                              key={`video-${topic}`}
+                              type="button"
+                              onClick={() => {
+                                setVideoTopic(topic);
+                                setVideoStudioOpen(false);
+                              }}
+                              className={cn(
+                                "shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition-all",
+                                videoTopic === topic
+                                  ? "border-blue-500 bg-blue-600 text-white"
+                                  : "border-white/15 bg-black/40 text-[#d6d0c6] hover:border-blue-400/50 hover:bg-white/5"
+                              )}
+                            >
+                              {topic}
+                            </button>
+                          ))}
+                        </div>
+                        {videosMessage && (
+                          <p className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-[#d6d0c6]/70">
+                            {videosMessage}
+                          </p>
+                        )}
+                      </div>
+                    </section>
+
+                    {recentLearningVideos.length > 0 && (
+                      <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                            <Clock3 className="size-5 text-blue-300" />
+                            Recently Viewed
+                          </CardTitle>
+                          <p className="text-sm text-[#d6d0c6]/60">
+                            Resume a video with its saved notes and snapshots.
+                          </p>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            {recentLearningVideos.slice(0, 4).map((video) => (
+                              <div
+                                key={video.id}
+                                className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+                              >
+                                <div
+                                  className="h-32 bg-[#141416] bg-cover bg-center"
+                                  style={
+                                    video.thumbnailUrl
+                                      ? { backgroundImage: `url(${video.thumbnailUrl})` }
+                                      : undefined
+                                  }
+                                >
+                                  <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/80 p-3">
+                                    <Badge className="bg-black/70 text-white hover:bg-black/70">
+                                      {video.topic}
+                                    </Badge>
+                                    <span className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white">
+                                      {formatVideoProgress(video.progressSeconds)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-3 p-4">
+                                  <div>
+                                    <p className="line-clamp-2 text-sm font-bold text-[#f6f1e8]">
+                                      {video.title}
+                                    </p>
+                                    <p className="mt-1 line-clamp-1 text-xs text-[#d6d0c6]/50">
+                                      {video.channelTitle}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => openVideoStudyRoom(video, true)}
+                                      className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
+                                    >
+                                      Resume
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openVideoStudyRoom(video, false)}
+                                      className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                                    >
+                                      Start over
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    <section className="space-y-3">
+                      <div>
+                        <h3 className="text-lg font-black text-[#f6f1e8]">
+                          Pick a recommendation section
+                        </h3>
+                        <p className="text-sm text-[#d6d0c6]/60">
+                          Each section loads only 3 YouTube videos to keep API usage low.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {videoTopicSections.map((section) => {
+                          const active = videoTopic === section.topic;
+
+                          return (
+                            <button
+                              key={section.topic}
+                              type="button"
+                              onClick={() => {
+                                setVideoTopic(section.topic);
+                                setVideoStudioOpen(false);
+                              }}
+                              className={cn(
+                                "rounded-2xl border bg-gradient-to-br p-4 text-left transition-all hover:-translate-y-1 hover:border-blue-400/60",
+                                section.accent,
+                                active
+                                  ? "border-blue-500 shadow-lg shadow-blue-500/20"
+                                  : "border-white/10"
+                              )}
+                            >
+                              <Badge className="border border-white/10 bg-black/35 text-white hover:bg-black/35">
+                                3 videos
+                              </Badge>
+                              <p className="mt-3 font-bold text-[#f6f1e8]">
+                                {section.title}
+                              </p>
+                              <p className="mt-2 text-sm leading-relaxed text-[#d6d0c6]/60">
+                                {section.description}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <Card className="min-w-0 border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                          <Search className="size-5 text-blue-300" />
+                          {videoTopic} Recommendations
+                        </CardTitle>
+                        <p className="text-sm text-[#d6d0c6]/60">
+                          Showing only 3 videos for this section.
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {videosLoading ? (
+                          <div className="grid gap-3 md:grid-cols-3">
+                            {[1, 2, 3].map((item) => (
+                              <div
+                                key={item}
+                                className="h-64 animate-pulse rounded-2xl bg-white/10"
+                              />
+                            ))}
+                          </div>
+                        ) : learningVideos.length ? (
+                          <div className="grid gap-3 md:grid-cols-3">
+                            {learningVideos.map((video) => (
+                              <button
+                                key={video.id}
+                                type="button"
+                                onClick={() => {
+                                  openVideoStudyRoom(video, true);
+                                }}
+                                className="group min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-[#111113] text-left transition-all hover:-translate-y-1 hover:border-blue-500 hover:bg-[#171719]"
+                              >
+                                <div
+                                  className="h-44 bg-[#141416] bg-cover bg-center"
+                                  style={
+                                    video.thumbnailUrl
+                                      ? { backgroundImage: `url(${video.thumbnailUrl})` }
+                                      : undefined
+                                  }
+                                >
+                                  <div className="flex h-full items-start justify-between bg-gradient-to-b from-black/10 to-black/80 p-3">
+                                    <Badge className="bg-black/70 text-white hover:bg-black/70">
+                                      {video.topic}
+                                    </Badge>
+                                    <span className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-transform group-hover:scale-105">
+                                      {getRecentProgress(video.id) > 0 ? "Resume" : "Open"}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-2 p-4">
+                                  <p className="line-clamp-2 font-bold text-[#f6f1e8]">
+                                    {video.title}
+                                  </p>
+                                  <p className="line-clamp-1 text-xs text-[#d6d0c6]/50">
+                                    {video.channelTitle}
+                                  </p>
+                                  {getRecentProgress(video.id) > 0 && (
+                                    <p className="text-xs font-semibold text-blue-200">
+                                      Resume from {formatVideoProgress(getRecentProgress(video.id))}
+                                    </p>
+                                  )}
+                                  <p className="line-clamp-3 text-xs leading-relaxed text-[#d6d0c6]/60">
+                                    {video.description}
+                                  </p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
+                            No videos loaded yet. Check that `YOUTUBE_API_KEY` is set, then try another topic.
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeSection === "notes" && (
+              <div className="-m-3 min-w-0 space-y-4 overflow-x-hidden rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
+                <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-6">
+                  <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <Badge className="w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
+                        Learning notes
+                      </Badge>
+                      <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+                        Your saved notes in one place.
+                      </h2>
+                      <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
+                        Search notes by content, topic, or the video they were created with.
+                      </p>
+                    </div>
+                    <Badge className="border border-white/10 bg-white/[0.05] text-[#f6f1e8] hover:bg-white/[0.05]">
+                      {savedVideoNotes.length} saved
+                    </Badge>
+                  </div>
+                </section>
+
+                <Card className="border-white/10 bg-[#0b0b0d] text-[#f6f1e8] shadow-xl shadow-black/40">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-[#f6f1e8]">
+                      <Search className="size-5 text-blue-300" />
+                      Search Notes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <input
+                      value={noteSearch}
+                      onChange={(event) => setNoteSearch(event.target.value)}
+                      placeholder="Search note title, video, topic, or note content..."
+                      className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-[#f6f1e8] outline-none placeholder:text-[#d6d0c6]/35 focus:border-blue-400/60"
+                    />
+                    {filteredSavedVideoNotes.length ? (
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {filteredSavedVideoNotes.map((note) => {
+                          const relatedVideo = recentLearningVideos.find(
+                            (video) => video.id === note.videoId
+                          );
+
+                          return (
+                            <div
+                              key={note.videoId}
+                              className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="line-clamp-2 text-base font-bold text-[#f6f1e8]">
+                                    {note.videoTitle}
+                                  </p>
+                                  <p className="mt-1 text-xs text-blue-200">
+                                    Made with: {note.topic}
+                                  </p>
+                                  <p className="mt-1 text-xs text-[#d6d0c6]/45">
+                                    Updated {new Date(note.updatedAt).toLocaleString()}
+                                  </p>
+                                </div>
+                                <NotebookPen className="size-5 shrink-0 text-blue-300" />
+                              </div>
+                              <p className="mt-4 line-clamp-5 whitespace-pre-wrap text-sm leading-relaxed text-[#d6d0c6]/70">
+                                {note.content || "Empty note"}
+                              </p>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setVideoNote(note.content);
+                                    setNoteStatus(`Loaded note for ${note.videoTitle}.`);
+                                  }}
+                                  className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-bold text-[#f6f1e8] transition-colors hover:bg-white/10"
+                                >
+                                  Load note
+                                </button>
+                                {relatedVideo ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveSection("videos");
+                                      openVideoStudyRoom(relatedVideo, true);
+                                    }}
+                                    className="rounded-full bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-500"
+                                  >
+                                    Open with video
+                                  </button>
+                                ) : (
+                                  <span className="rounded-full border border-white/10 bg-white/[0.02] px-3 py-2 text-xs font-bold text-[#d6d0c6]/45">
+                                    Video not in recent list
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-sm text-[#d6d0c6]/70">
+                        No notes found yet. Open a learning video and start taking notes.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             {activeSection === "spotify" && (
               <div className="-m-3 min-w-0 space-y-4 overflow-x-hidden rounded-[1.5rem] border border-white/10 bg-[#050506] p-3 text-[#f6f1e8] shadow-2xl shadow-black/60 sm:-m-4 sm:space-y-5 sm:rounded-[2rem] sm:p-4 md:p-6">
                 {spotifyConnection === null ? (
@@ -489,7 +1466,7 @@ function DashboardContent() {
                       </Badge>
                       <div>
                         <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
-                          Play study audio inside Virtual Lab.
+                          Play study audio inside UpSkillr.
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
                           Pick a topic and start a Spotify episode or show from
@@ -730,7 +1707,7 @@ function DashboardContent() {
                   <p className="mt-2 text-xs text-[#d6d0c6]/55">
                     {totalDrawerItems
                       ? `${totalDrawerItems} total · ${remainingDrawerItems} left from current selection`
-                      : "Open an item below to play it in Virtual Lab."}
+                      : "Open an item below to play it in UpSkillr."}
                   </p>
                 </div>
               </div>

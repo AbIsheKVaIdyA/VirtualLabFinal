@@ -22,9 +22,9 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Virtual Lab | Learn, Build, Achieve",
+  title: "UpSkillr | Learn, Build, Achieve",
   description:
-    "Virtual Lab is a modern learning platform for universities with courses, progress tracking, badges, and community-first learning.",
+    "UpSkillr is a modern learning platform for universities with courses, progress tracking, badges, and community-first learning.",
 };
 
 export default function RootLayout({

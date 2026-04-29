@@ -1,6 +1,6 @@
 -- Run this once if you already executed the older communication schema.
 -- It makes the community chat compatible with Clerk text user IDs and seeds
--- the default Virtual Lab workspace used by the app.
+-- the default UpSkillr workspace used by the app.
 
 alter table if exists public.messages
   drop constraint if exists messages_user_id_fkey;
@@ -25,7 +25,7 @@ alter table if exists public.messages
   add column if not exists author_name text not null default 'Student';
 
 insert into public.tenants (id, name, plan)
-values ('11111111-1111-4111-8111-111111111111', 'Virtual Lab School', 'free')
+values ('11111111-1111-4111-8111-111111111111', 'UpSkillr School', 'free')
 on conflict (id) do update set name = excluded.name;
 
 insert into public.servers (id, tenant_id, name, icon)
@@ -33,7 +33,7 @@ values (
   '22222222-2222-4222-8222-222222222222',
   '11111111-1111-4111-8111-111111111111',
   'Campus',
-  'VL'
+  null
 )
 on conflict (id) do update set name = excluded.name, icon = excluded.icon;
 

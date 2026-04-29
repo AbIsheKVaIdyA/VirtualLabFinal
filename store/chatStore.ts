@@ -10,7 +10,7 @@ import { create } from "zustand";
 
 const tenant: Tenant = {
   id: "11111111-1111-4111-8111-111111111111",
-  name: "Virtual Lab School",
+  name: "UpSkillr School",
   plan: "free",
   createdAt: new Date().toISOString(),
 };
@@ -29,7 +29,7 @@ const servers: Server[] = [
     id: "22222222-2222-4222-8222-222222222222",
     tenantId: tenant.id,
     name: "Campus",
-    icon: "VL",
+    icon: null,
   },
 ];
 

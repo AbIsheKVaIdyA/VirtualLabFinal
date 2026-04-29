@@ -1,4 +1,4 @@
--- Virtual Lab communication platform schema
+-- UpSkillr communication platform schema
 -- Run this in Supabase SQL editor after creating the project.
 
 create extension if not exists "pgcrypto";
@@ -152,7 +152,7 @@ alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.voice_sessions;
 
 insert into public.tenants (id, name, plan)
-values ('11111111-1111-4111-8111-111111111111', 'Virtual Lab School', 'free')
+values ('11111111-1111-4111-8111-111111111111', 'UpSkillr School', 'free')
 on conflict (id) do update set name = excluded.name;
 
 insert into public.servers (id, tenant_id, name, icon)
@@ -160,7 +160,7 @@ values (
   '22222222-2222-4222-8222-222222222222',
   '11111111-1111-4111-8111-111111111111',
   'Campus',
-  'VL'
+  null
 )
 on conflict (id) do update set name = excluded.name, icon = excluded.icon;
 

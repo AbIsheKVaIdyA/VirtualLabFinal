@@ -87,10 +87,7 @@ export default function Home() {
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-4 py-6 sm:px-6 sm:py-10 lg:gap-14 lg:px-10">
         <header className="grid gap-4 sm:flex sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="rounded-lg bg-primary px-2 py-1 text-sm font-semibold text-primary-foreground">
-              VL
-            </span>
-            <p className="font-semibold tracking-tight">Virtual Lab</p>
+            <p className="font-semibold tracking-tight">UpSkillr</p>
           </div>
           <div className="flex items-center justify-between gap-2 sm:justify-end">
             <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
@@ -107,7 +104,7 @@ export default function Home() {
                 Learn through courses, community, and focused study habits.
               </h1>
               <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-                Virtual Lab is a student dashboard for structured courses,
+                UpSkillr is a student dashboard for structured courses,
                 gamified progress, a built-in learning community, and educational
                 podcasts in one simple experience.
               </p>
@@ -264,7 +261,7 @@ export default function Home() {
               href="/dashboard"
               className={cn(buttonVariants({ size: "lg" }), "w-full shrink-0 gap-2 sm:w-auto")}
             >
-              Open Virtual Lab
+              Open UpSkillr
               <ArrowRight className="size-4" />
             </Link>
           </div>

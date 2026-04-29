@@ -70,7 +70,7 @@ export function CommunityWorkspace({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
-              {activeServer?.name ?? "Virtual Lab"}
+              {activeServer?.name ?? "UpSkillr"}
             </h1>
             <p className="mt-1 max-w-2xl text-xs text-[#d6d0c6]/55 sm:text-sm">
               Course channels, voice rooms, and live study conversations in one workspace.
