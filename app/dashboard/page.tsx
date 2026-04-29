@@ -14,13 +14,13 @@ import {
   Link2,
   ListMusic,
   NotebookPen,
+  PauseCircle,
   PlayCircle,
   Podcast,
   Save,
   Search,
   SkipBack,
   SkipForward,
-  Square,
   Video,
   X,
 } from "lucide-react";
@@ -180,6 +180,7 @@ function DashboardContent() {
   const [audioDrawerItems, setAudioDrawerItems] = useState<SpotifyPodcast[]>([]);
   const [audioDrawerLoading, setAudioDrawerLoading] = useState(false);
   const [lastSpotifyPodcast, setLastSpotifyPodcast] = useState<SpotifyPodcast | null>(null);
+  const [spotifyPlayerPaused, setSpotifyPlayerPaused] = useState(false);
   const [videoTopic, setVideoTopic] = useState("All");
   const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<LearningVideo | null>(null);
@@ -240,6 +241,7 @@ function DashboardContent() {
     if (!item) return;
 
     setLastSpotifyPodcast(item);
+    setSpotifyPlayerPaused(false);
     window.localStorage.setItem(SPOTIFY_LAST_AUDIO_KEY, JSON.stringify(item));
   };
   const selectNextSpotifyItem = () => {
@@ -253,6 +255,19 @@ function DashboardContent() {
     const previousIndex =
       selectedAudioIndex > 0 ? selectedAudioIndex - 1 : spotifyPodcasts.length - 1;
     selectSpotifyAudio(spotifyPodcasts[previousIndex]);
+  };
+  const toggleSpotifyPlayback = () => {
+    if (selectedSpotifyPodcast) {
+      setSpotifyPlayerPaused((current) => !current);
+      return;
+    }
+
+    if (lastSpotifyPodcast) {
+      selectSpotifyAudio(lastSpotifyPodcast);
+      return;
+    }
+
+    selectNextSpotifyItem();
   };
   const readRecentLearningVideos = () => {
     try {
@@ -657,15 +672,16 @@ function DashboardContent() {
   }, [activeSection]);
 
   useEffect(() => {
-    if (activeSection !== "spotify" || !spotifyConnection?.connected) {
+    if (!spotifyConnection?.connected) {
       queueMicrotask(() => {
         setSpotifyPodcasts([]);
-        setSelectedSpotifyPodcast(null);
         setSpotifyMessage(null);
         setSpotifyLoading(false);
       });
       return;
     }
+
+    if (activeSection !== "spotify") return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({ category: spotifyCategory });
@@ -714,6 +730,7 @@ function DashboardContent() {
     <div
       className={cn(
         "relative min-h-screen overflow-x-hidden transition-colors duration-700",
+        selectedSpotifyPodcast?.embedUrl && !spotifyPlayerPaused && "pb-28",
         activeSection === "spotify" && "bg-[#050505] text-white"
       )}
     >
@@ -768,7 +785,7 @@ function DashboardContent() {
             </nav>
 
             <div className="flex items-center justify-between gap-2 lg:justify-end">
-              {activeSection === "spotify" && spotifyConnection?.connected && (
+              {(selectedSpotifyPodcast || lastSpotifyPodcast || spotifyConnection?.connected) && (
                 <div className="hidden max-w-[28rem] items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-[#f6f1e8] lg:flex">
                   <span
                     className="size-9 shrink-0 rounded-full border border-white/10 bg-[#141416] bg-cover bg-center"
@@ -793,25 +810,15 @@ function DashboardContent() {
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      selectedSpotifyPodcast
-                        ? selectSpotifyAudio(selectedSpotifyPodcast)
-                        : lastSpotifyPodcast
-                          ? selectSpotifyAudio(lastSpotifyPodcast)
-                        : selectNextSpotifyItem()
-                    }
+                    onClick={toggleSpotifyPlayback}
                     className="rounded-full bg-[#b11226] p-2 text-white transition-colors hover:bg-[#8f0e1f]"
-                    aria-label="Resume selected Spotify item"
+                    aria-label={spotifyPlayerPaused ? "Play Spotify item" : "Pause Spotify item"}
                   >
-                    <PlayCircle className="size-3.5 fill-current" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSpotifyPodcast(null)}
-                    className="rounded-full p-2 transition-colors hover:bg-white/10"
-                    aria-label="Stop selected Spotify item"
-                  >
-                    <Square className="size-3.5" />
+                    {spotifyPlayerPaused ? (
+                      <PlayCircle className="size-3.5 fill-current" />
+                    ) : (
+                      <PauseCircle className="size-3.5 fill-current" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -876,9 +883,6 @@ function DashboardContent() {
                   <section className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-5">
                       <div className="min-w-0">
-                        <Badge className="mb-3 w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
-                          Study room
-                        </Badge>
                         <h2 className="line-clamp-2 text-2xl font-black tracking-tight sm:text-3xl">
                           {selectedVideo.title}
                         </h2>
@@ -1295,10 +1299,7 @@ function DashboardContent() {
                 <section className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_34%),linear-gradient(135deg,#15161d_0%,#08080a_55%,#030304_100%)] p-4 shadow-2xl shadow-black/50 sm:p-6">
                   <div className="flex flex-wrap items-end justify-between gap-4">
                     <div>
-                      <Badge className="w-fit border border-blue-400/30 bg-blue-500/15 text-blue-100 hover:bg-blue-500/15">
-                        Learning notes
-                      </Badge>
-                      <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
+                      <h2 className="text-3xl font-black tracking-tight sm:text-4xl md:text-5xl">
                         Your saved notes in one place.
                       </h2>
                       <p className="mt-3 max-w-2xl text-sm text-[#d6d0c6]/75 md:text-base">
@@ -1461,9 +1462,6 @@ function DashboardContent() {
                 <section className="min-w-0 overflow-hidden rounded-[1.5rem] border border-white/10 bg-[linear-gradient(135deg,#171719_0%,#080809_44%,#36080c_100%)] p-4 shadow-2xl shadow-black/70 sm:rounded-[1.75rem] sm:p-6">
                   <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(360px,1.1fr)] xl:gap-6">
                     <div className="space-y-5">
-                      <Badge className="w-fit border border-[#b11226]/40 bg-[#b11226]/15 text-[#f6f1e8] hover:bg-[#b11226]/15">
-                        Curated audio library
-                      </Badge>
                       <div>
                         <h2 className="max-w-4xl text-3xl font-black tracking-tight sm:text-4xl md:text-6xl">
                           Play study audio inside UpSkillr.
@@ -1513,30 +1511,23 @@ function DashboardContent() {
                         </p>
                       </CardHeader>
                       <CardContent>
-                        {selectedSpotifyPodcast?.embedUrl ? (
-                          <iframe
-                            title={`Spotify player for ${selectedSpotifyPodcast.title}`}
-                            src={selectedSpotifyPodcast.embedUrl}
-                            width="100%"
-                            height="352"
-                            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                            loading="lazy"
-                            className="min-h-[240px] rounded-2xl border-0"
-                          />
-                        ) : (
-                          <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
+                        <div className="grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-5 text-center text-sm text-[#d6d0c6]/70">
                             <div className="space-y-3">
                               <p className="font-semibold text-[#f6f1e8]">
-                                {lastSpotifyPodcast
-                                  ? "Continue your last Spotify item."
+                                {selectedSpotifyPodcast
+                                  ? "Spotify is playing from the global player."
+                                  : lastSpotifyPodcast
+                                    ? "Continue your last Spotify item."
                                   : "Choose something to play."}
                               </p>
                               <p className="mt-2">
-                                {lastSpotifyPodcast
-                                  ? "This reopens the same Spotify embed you were using."
+                                {selectedSpotifyPodcast
+                                  ? "Use the navbar control from any section. The player stays mounted while you move around."
+                                  : lastSpotifyPodcast
+                                    ? "This reopens the same Spotify embed you were using."
                                   : "Spotify recommendations are loading below."}
                               </p>
-                              {lastSpotifyPodcast && (
+                              {!selectedSpotifyPodcast && lastSpotifyPodcast && (
                                 <button
                                   type="button"
                                   onClick={() => selectSpotifyAudio(lastSpotifyPodcast)}
@@ -1547,7 +1538,6 @@ function DashboardContent() {
                               )}
                             </div>
                           </div>
-                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -1786,6 +1776,19 @@ function DashboardContent() {
               )}
             </div>
           </div>
+        </div>
+      )}
+      {selectedSpotifyPodcast?.embedUrl && !spotifyPlayerPaused && (
+        <div className="fixed inset-x-3 bottom-3 z-40 mx-auto max-w-3xl rounded-2xl border border-white/10 bg-[#08080a]/95 p-2 shadow-2xl shadow-black/60 backdrop-blur">
+          <iframe
+            title={`Spotify global player for ${selectedSpotifyPodcast.title}`}
+            src={selectedSpotifyPodcast.embedUrl}
+            width="100%"
+            height="88"
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+            loading="lazy"
+            className="rounded-xl border-0"
+          />
         </div>
       )}
     </div>
