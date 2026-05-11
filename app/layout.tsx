@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google";
 
+import { SiteFooter } from "@/components/site-footer";
 import { ThemeProvider } from "@/components/theme-provider";
 
 import "./globals.css";
@@ -45,10 +46,11 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} ${plusJakartaSans.variable} h-full w-full overflow-x-hidden antialiased`}
       suppressHydrationWarning
     >
-      <body className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden">
+      <body className="flex min-h-dvh w-full min-w-0 flex-col overflow-x-hidden bg-background">
         <ClerkProvider>
           <ThemeProvider>
-            {children}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+            <SiteFooter />
           </ThemeProvider>
         </ClerkProvider>
       </body>
